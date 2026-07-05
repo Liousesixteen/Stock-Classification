@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ConfidenceLevel, RelationType } from "@/lib/domain/types";
+import type { ConfidenceLevel, RelationType, SourceType } from "@/lib/domain/types";
 
 export type RelationInput = {
   stockCode: string;
@@ -12,6 +12,20 @@ export type RelationInput = {
 
 type RelationIdRow = {
   id: number;
+};
+
+type CategoryRelationRow = {
+  id: number;
+  stockCode: string;
+  shortName: string;
+  intro: string;
+  categoryId: number;
+  relationType: RelationType;
+  confidence: ConfidenceLevel;
+  rationale: string;
+  isWatchlist: number;
+  sourceType: SourceType | null;
+  sourceTitle: string | null;
 };
 
 export function upsertRelation(db: Database.Database, relation: RelationInput) {
@@ -55,8 +69,19 @@ export function upsertRelation(db: Database.Database, relation: RelationInput) {
   return row.id;
 }
 
+export function setPrimaryEvidenceForRelation(db: Database.Database, relationId: number, evidenceId: number) {
+  db.prepare(
+    `
+      update company_category_relations
+      set primary_evidence_id = ?,
+          updated_at = current_timestamp
+      where id = ?
+    `,
+  ).run(evidenceId, relationId);
+}
+
 export function listRelationsForCategory(db: Database.Database, categoryId: number) {
-  return db
+  const rows = db
     .prepare(
       `
         select
@@ -68,6 +93,7 @@ export function listRelationsForCategory(db: Database.Database, categoryId: numb
           r.relation_type as relationType,
           r.confidence,
           r.rationale,
+          r.is_watchlist as isWatchlist,
           e.source_type as sourceType,
           e.title as sourceTitle
         from company_category_relations r
@@ -85,18 +111,9 @@ export function listRelationsForCategory(db: Database.Database, categoryId: numb
           r.stock_code
       `,
     )
-    .all(categoryId) as {
-    id: number;
-    stockCode: string;
-    shortName: string;
-    intro: string;
-    categoryId: number;
-    relationType: RelationType;
-    confidence: ConfidenceLevel;
-    rationale: string;
-    sourceType: string | null;
-    sourceTitle: string | null;
-  }[];
+    .all(categoryId) as CategoryRelationRow[];
+
+  return rows.map((row) => ({ ...row, isWatchlist: row.isWatchlist === 1 }));
 }
 
 export function listRelationsForCompany(db: Database.Database, stockCode: string) {
