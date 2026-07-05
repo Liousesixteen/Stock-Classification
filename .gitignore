@@ -8,3 +8,8 @@ build/
 *.log
 *.sqlite-wal
 *.sqlite-shm
+data/*.sqlite
+data/*.db
+playwright-report/
+test-results/
+coverage/
