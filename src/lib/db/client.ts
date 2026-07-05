@@ -4,15 +4,18 @@ import path from "node:path";
 import { migrate } from "./schema";
 import { seedSemiconductorData } from "./seed";
 
-let appDb: Database.Database | null = null;
+const appDbs = new Map<string, Database.Database>();
 
 export function getDatabase(dbPath = path.join(process.cwd(), "data", "stock-classification.sqlite")) {
-  if (appDb) return appDb;
+  const resolvedPath = path.resolve(dbPath);
+  const cachedDb = appDbs.get(resolvedPath);
+  if (cachedDb) return cachedDb;
 
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  appDb = new Database(dbPath);
-  appDb.pragma("foreign_keys = ON");
-  migrate(appDb);
-  seedSemiconductorData(appDb);
-  return appDb;
+  fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+  const db = new Database(resolvedPath);
+  db.pragma("foreign_keys = ON");
+  migrate(db);
+  seedSemiconductorData(db);
+  appDbs.set(resolvedPath, db);
+  return db;
 }

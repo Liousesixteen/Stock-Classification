@@ -37,7 +37,7 @@ export function migrate(db: Database.Database) {
       relation_type text not null,
       confidence text not null,
       rationale text not null default '',
-      primary_evidence_id integer,
+      primary_evidence_id integer references evidences(id) on delete set null,
       is_watchlist integer not null default 0,
       created_at text not null default current_timestamp,
       updated_at text not null default current_timestamp,
@@ -70,6 +70,7 @@ export function migrate(db: Database.Database) {
     );
 
     create index if not exists idx_categories_parent on categories(parent_id, sort_order);
+    create unique index if not exists idx_categories_root_name on categories(name) where parent_id is null;
     create index if not exists idx_relations_category on company_category_relations(category_id);
     create index if not exists idx_relations_stock on company_category_relations(stock_code);
     create index if not exists idx_evidences_relation on evidences(relation_id);
