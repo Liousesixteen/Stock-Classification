@@ -1,0 +1,9 @@
+.superpowers/
+node_modules/
+.next/
+dist/
+build/
+.DS_Store
+*.log
+*.sqlite-wal
+*.sqlite-shm
