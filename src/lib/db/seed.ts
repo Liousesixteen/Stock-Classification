@@ -5,7 +5,23 @@ type CategorySeed = {
   aliases?: string[];
   description?: string;
   industry?: string;
+  stocks?: StockSeed[];
   children?: CategorySeed[];
+};
+
+type StockSeed = {
+  stockCode: string;
+  shortName: string;
+  fullName?: string;
+  board: string;
+  industry: string;
+  region?: string;
+  marketCapBand?: string;
+  intro: string;
+  mainBusiness: string;
+  relationType?: "主营业务" | "重要相关" | "概念/少量布局" | "待验证";
+  confidence?: "高" | "中" | "低";
+  rationale: string;
 };
 
 const semiconductorTree: CategorySeed = {
@@ -119,6 +135,449 @@ const semiconductorTree: CategorySeed = {
   ],
 };
 
+const themeBoards: CategorySeed[] = [
+  {
+    name: "创新药",
+    aliases: ["创新药概念", "创新药板块", "BK1106"],
+    description: "覆盖 A 股创新药研发、商业化、ADC/生物药及相关医药服务标的。",
+    industry: "医药生物",
+    stocks: [
+      {
+        stockCode: "688235",
+        shortName: "百济神州",
+        board: "科创板",
+        industry: "化学制药",
+        intro: "全球化创新药企业，围绕肿瘤、自身免疫等方向推进研发和商业化。",
+        mainBusiness: "创新药研发、生产及商业化。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，主营聚焦创新药研发和商业化。",
+      },
+      {
+        stockCode: "600276",
+        shortName: "恒瑞医药",
+        board: "沪市主板",
+        industry: "化学制药",
+        intro: "国内创新药龙头之一，覆盖抗肿瘤、麻醉、造影剂等领域。",
+        mainBusiness: "药品研发、生产和销售，持续推进创新药管线。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，国内创新药代表公司。",
+      },
+      {
+        stockCode: "688331",
+        shortName: "荣昌生物",
+        board: "科创板",
+        industry: "生物制品",
+        intro: "生物创新药企业，布局抗体偶联药物、融合蛋白和抗体药物。",
+        mainBusiness: "生物创新药研发、生产和商业化。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，创新生物药和 ADC 代表标的。",
+      },
+      {
+        stockCode: "688506",
+        shortName: "百利天恒",
+        board: "科创板",
+        industry: "生物制品",
+        intro: "创新生物药公司，重点推进双抗 ADC 等肿瘤治疗管线。",
+        mainBusiness: "创新生物药研发及产业化。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，创新药研发属性突出。",
+      },
+      {
+        stockCode: "688578",
+        shortName: "艾力斯",
+        board: "科创板",
+        industry: "化学制药",
+        intro: "专注肿瘤治疗领域的小分子创新药企业。",
+        mainBusiness: "抗肿瘤创新药研发、生产和销售。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，创新药商业化标的。",
+      },
+      {
+        stockCode: "688428",
+        shortName: "诺诚健华",
+        board: "科创板",
+        industry: "化学制药",
+        intro: "聚焦肿瘤和自身免疫疾病的创新药企业。",
+        mainBusiness: "创新药研发、生产和商业化。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，具备创新药管线和商业化产品。",
+      },
+      {
+        stockCode: "002653",
+        shortName: "海思科",
+        board: "深市主板",
+        industry: "化学制药",
+        intro: "医药企业，持续推进麻醉、肿瘤、自免等创新药布局。",
+        mainBusiness: "药品研发、生产及销售。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "东方财富创新药 BK1106 成分，创新药布局占公司研究重点。",
+      },
+      {
+        stockCode: "002422",
+        shortName: "科伦药业",
+        board: "深市主板",
+        industry: "化学制药",
+        intro: "大型制药企业，创新药和输液、抗生素等业务并行发展。",
+        mainBusiness: "药品研发、生产和销售。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "东方财富创新药 BK1106 成分，创新药管线具备研究价值。",
+      },
+      {
+        stockCode: "600196",
+        shortName: "复星医药",
+        board: "沪市主板",
+        industry: "化学制药",
+        intro: "综合医药集团，覆盖药品、医疗器械、医疗服务等方向。",
+        mainBusiness: "医药制造、研发和医疗健康服务。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "东方财富创新药 BK1106 成分，创新药为其重要布局方向之一。",
+      },
+      {
+        stockCode: "300558",
+        shortName: "贝达药业",
+        board: "创业板",
+        industry: "化学制药",
+        intro: "以肿瘤精准治疗为核心的创新药企业。",
+        mainBusiness: "创新药研发、生产和销售。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，创新药主营属性明确。",
+      },
+      {
+        stockCode: "688266",
+        shortName: "泽璟制药-U",
+        board: "科创板",
+        industry: "化学制药",
+        intro: "创新药研发企业，聚焦肿瘤、出血及血液疾病等领域。",
+        mainBusiness: "创新药研发、生产和商业化。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，创新药研发属性明确。",
+      },
+      {
+        stockCode: "688321",
+        shortName: "微芯生物",
+        board: "科创板",
+        industry: "化学制药",
+        intro: "原创新药企业，围绕肿瘤、代谢疾病和自身免疫方向研发。",
+        mainBusiness: "原创新药研发、生产和销售。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富创新药 BK1106 成分，原创新药代表标的。",
+      },
+    ],
+  },
+  {
+    name: "机器人",
+    aliases: ["机器人概念", "人形机器人", "BK1090"],
+    description: "覆盖工业机器人、人形机器人、运动控制、减速器、传感器和自动化部件。",
+    industry: "机械设备",
+    stocks: [
+      {
+        stockCode: "300124",
+        shortName: "汇川技术",
+        board: "创业板",
+        industry: "自动化设备",
+        intro: "工业自动化龙头，覆盖变频器、伺服、控制器等自动化核心部件。",
+        mainBusiness: "工业自动化控制产品、新能源汽车电控等。",
+        relationType: "重要相关",
+        confidence: "高",
+        rationale: "东方财富机器人 BK1090 成分，运动控制和伺服系统是机器人核心部件。",
+      },
+      {
+        stockCode: "002050",
+        shortName: "三花智控",
+        board: "深市主板",
+        industry: "家电零部件",
+        intro: "热管理龙头，亦布局机器人机电执行器等方向。",
+        mainBusiness: "制冷空调电器零部件、汽车热管理及机电执行器。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "东方财富机器人 BK1090 成分，机器人执行器方向具备主题相关性。",
+      },
+      {
+        stockCode: "688017",
+        shortName: "绿的谐波",
+        board: "科创板",
+        industry: "通用设备",
+        intro: "谐波减速器企业，产品用于工业机器人、服务机器人等场景。",
+        mainBusiness: "精密传动装置、谐波减速器研发生产销售。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "机器人减速器核心标的，东方财富机器人 BK1090 成分。",
+      },
+      {
+        stockCode: "002472",
+        shortName: "双环传动",
+        board: "深市主板",
+        industry: "汽车零部件",
+        intro: "精密齿轮和传动部件企业，布局机器人减速器及传动系统。",
+        mainBusiness: "齿轮传动产品、精密传动部件研发制造。",
+        relationType: "重要相关",
+        confidence: "高",
+        rationale: "东方财富机器人 BK1090 成分，精密传动方向相关度高。",
+      },
+      {
+        stockCode: "002747",
+        shortName: "埃斯顿",
+        board: "深市主板",
+        industry: "自动化设备",
+        intro: "工业机器人及智能制造系统企业。",
+        mainBusiness: "工业机器人、自动化核心部件和智能制造系统。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "工业机器人本体与自动化系统标的，东方财富机器人 BK1090 成分。",
+      },
+      {
+        stockCode: "300024",
+        shortName: "机器人",
+        board: "创业板",
+        industry: "自动化设备",
+        intro: "以机器人与智能制造解决方案为核心的自动化企业。",
+        mainBusiness: "工业机器人、移动机器人、智能制造装备和系统集成。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "公司名称和主营均指向机器人，东方财富机器人 BK1090 成分。",
+      },
+      {
+        stockCode: "002979",
+        shortName: "雷赛智能",
+        board: "深市主板",
+        industry: "自动化设备",
+        intro: "运动控制企业，产品包括步进、伺服、控制器等。",
+        mainBusiness: "运动控制核心部件研发、生产和销售。",
+        relationType: "重要相关",
+        confidence: "高",
+        rationale: "运动控制是机器人核心环节，东方财富机器人 BK1090 成分。",
+      },
+      {
+        stockCode: "603662",
+        shortName: "柯力传感",
+        board: "沪市主板",
+        industry: "仪器仪表",
+        intro: "传感器企业，布局力学传感器和智能感知方向。",
+        mainBusiness: "应变式传感器、仪表和工业物联网产品。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "机器人感知环节相关标的，东方财富机器人 BK1090 成分。",
+      },
+      {
+        stockCode: "688160",
+        shortName: "步科股份",
+        board: "科创板",
+        industry: "自动化设备",
+        intro: "工业自动化控制企业，产品包括人机界面、伺服系统等。",
+        mainBusiness: "工业自动化控制设备研发、生产和销售。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "运动控制和自动化部件与机器人产业链相关。",
+      },
+      {
+        stockCode: "300607",
+        shortName: "拓斯达",
+        board: "创业板",
+        industry: "自动化设备",
+        intro: "提供工业机器人、注塑自动化和智能制造系统。",
+        mainBusiness: "工业机器人及自动化应用系统。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "工业机器人和智能制造系统标的，东方财富机器人 BK1090 成分。",
+      },
+      {
+        stockCode: "688003",
+        shortName: "天准科技",
+        board: "科创板",
+        industry: "自动化设备",
+        intro: "机器视觉装备企业，服务工业检测和智能制造场景。",
+        mainBusiness: "机器视觉装备、工业检测装备和智能制造系统。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "机器视觉是机器人感知与检测的重要环节。",
+      },
+      {
+        stockCode: "301029",
+        shortName: "怡合达",
+        board: "创业板",
+        industry: "自动化设备",
+        intro: "自动化零部件平台型企业，服务智能制造和机器人自动化场景。",
+        mainBusiness: "自动化零部件研发、销售和供应链服务。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "自动化零部件平台与机器人产业链相关。",
+      },
+    ],
+  },
+  {
+    name: "商业航天",
+    aliases: ["商业航天概念", "卫星互联网", "BK0963"],
+    description: "覆盖卫星制造运营、航天电子、连接器、卫星应用和发射配套。",
+    industry: "国防军工",
+    stocks: [
+      {
+        stockCode: "601698",
+        shortName: "中国卫通",
+        board: "沪市主板",
+        industry: "航天装备",
+        intro: "卫星运营服务企业，提供卫星空间段运营和综合信息服务。",
+        mainBusiness: "卫星通信广播运营及综合信息服务。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富商业航天 BK0963 成分，卫星运营属性明确。",
+      },
+      {
+        stockCode: "600118",
+        shortName: "中国卫星",
+        board: "沪市主板",
+        industry: "航天装备",
+        intro: "小卫星制造和卫星应用企业。",
+        mainBusiness: "小卫星研制、卫星应用及相关技术服务。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "东方财富商业航天 BK0963 成分，卫星制造和应用核心标的。",
+      },
+      {
+        stockCode: "002025",
+        shortName: "航天电器",
+        board: "深市主板",
+        industry: "军工电子",
+        intro: "高端连接器和继电器供应商，服务航天航空等高可靠场景。",
+        mainBusiness: "连接器、继电器、电机等高端电子元器件。",
+        relationType: "重要相关",
+        confidence: "高",
+        rationale: "东方财富商业航天 BK0963 成分，航天电子元器件供应链标的。",
+      },
+      {
+        stockCode: "002179",
+        shortName: "中航光电",
+        board: "深市主板",
+        industry: "军工电子",
+        intro: "连接器龙头，产品应用于航空、航天、防务和高端制造。",
+        mainBusiness: "光电连接器、线缆组件及集成互连产品。",
+        relationType: "重要相关",
+        confidence: "高",
+        rationale: "商业航天上游高可靠互连器件相关标的，东方财富 BK0963 成分。",
+      },
+      {
+        stockCode: "688629",
+        shortName: "华丰科技",
+        board: "科创板",
+        industry: "军工电子",
+        intro: "高端连接器企业，面向防务、通信和工业等高可靠应用。",
+        mainBusiness: "光电连接器及互连产品。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "东方财富商业航天 BK0963 成分，航天电子配套方向相关。",
+      },
+      {
+        stockCode: "688103",
+        shortName: "国力电子",
+        board: "科创板",
+        industry: "其他电子",
+        intro: "电子真空器件企业，产品服务航天航空、新能源等领域。",
+        mainBusiness: "电子真空器件研发、生产和销售。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "东方财富商业航天 BK0963 成分，航天配套元器件方向相关。",
+      },
+      {
+        stockCode: "688418",
+        shortName: "震有科技",
+        board: "科创板",
+        industry: "通信设备",
+        intro: "通信系统设备企业，参与卫星通信和专网通信相关场景。",
+        mainBusiness: "核心网、指挥调度、卫星通信及专网通信系统。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "商业航天卫星通信应用方向相关，东方财富 BK0963 成分。",
+      },
+      {
+        stockCode: "300053",
+        shortName: "航宇微",
+        board: "创业板",
+        industry: "军工电子",
+        intro: "宇航电子和卫星大数据企业，服务航天及卫星应用。",
+        mainBusiness: "宇航电子、卫星大数据及人工智能业务。",
+        relationType: "主营业务",
+        confidence: "高",
+        rationale: "商业航天卫星应用和宇航电子标的，东方财富 BK0963 成分。",
+      },
+      {
+        stockCode: "300101",
+        shortName: "振芯科技",
+        board: "创业板",
+        industry: "军工电子",
+        intro: "北斗和集成电路相关企业，服务卫星导航和高可靠电子场景。",
+        mainBusiness: "北斗卫星导航终端、集成电路和安防监控。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "卫星导航应用方向相关，东方财富商业航天 BK0963 成分。",
+      },
+      {
+        stockCode: "300455",
+        shortName: "航天智装",
+        board: "创业板",
+        industry: "自动化设备",
+        intro: "航天技术应用企业，覆盖智能装备、传感测控等方向。",
+        mainBusiness: "智能装备、传感测控和航天应用相关产品。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "航天装备应用方向相关，东方财富商业航天 BK0963 成分。",
+      },
+      {
+        stockCode: "603267",
+        shortName: "鸿远电子",
+        board: "沪市主板",
+        industry: "元件",
+        intro: "高可靠电子元器件企业，产品应用于航空航天等领域。",
+        mainBusiness: "多层瓷介电容器等电子元器件。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "航天电子元器件供应链标的，东方财富商业航天 BK0963 成分。",
+      },
+      {
+        stockCode: "603678",
+        shortName: "火炬电子",
+        board: "沪市主板",
+        industry: "元件",
+        intro: "陶瓷电容器和新材料企业，服务高可靠电子应用场景。",
+        mainBusiness: "电子元器件、新材料研发生产销售。",
+        relationType: "重要相关",
+        confidence: "中",
+        rationale: "航天电子配套元器件方向相关，东方财富商业航天 BK0963 成分。",
+      },
+    ],
+  },
+  {
+    name: "证券",
+    aliases: ["证券Ⅱ", "券商", "BK0473"],
+    description: "覆盖综合券商、财富管理、投行业务和资本市场服务。",
+    industry: "非银金融",
+    stocks: [
+      { stockCode: "600030", shortName: "中信证券", board: "沪市主板", industry: "证券Ⅱ", intro: "综合性证券公司，业务覆盖经纪、投行、资管、自营等。", mainBusiness: "证券经纪、投资银行、资产管理、证券投资等。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，综合券商龙头。" },
+      { stockCode: "601211", shortName: "国泰海通", board: "沪市主板", industry: "证券Ⅱ", intro: "大型综合证券公司，覆盖财富管理、机构与投行等业务。", mainBusiness: "证券及期货经纪、投资银行、资产管理、自营投资等。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，综合券商代表。" },
+      { stockCode: "300059", shortName: "东方财富", board: "创业板", industry: "证券Ⅱ", intro: "互联网金融服务平台，旗下东方财富证券承接证券业务。", mainBusiness: "证券服务、金融数据服务、基金销售和互联网金融服务。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，互联网券商和财富管理代表。" },
+      { stockCode: "601066", shortName: "中信建投", board: "沪市主板", industry: "证券Ⅱ", intro: "综合证券公司，投行业务和财富管理业务具备较高关注度。", mainBusiness: "投资银行、财富管理、交易及机构客户服务等。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，券商板块代表标的。" },
+      { stockCode: "601688", shortName: "华泰证券", board: "沪市主板", industry: "证券Ⅱ", intro: "综合证券集团，财富管理和机构业务能力突出。", mainBusiness: "财富管理、机构服务、投资管理和国际业务。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，综合券商代表。" },
+      { stockCode: "000776", shortName: "广发证券", board: "深市主板", industry: "证券Ⅱ", intro: "全国性综合证券公司。", mainBusiness: "证券经纪、投行、资产管理、自营投资等。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，券商板块核心标的。" },
+      { stockCode: "600999", shortName: "招商证券", board: "沪市主板", industry: "证券Ⅱ", intro: "招商局集团旗下综合证券公司。", mainBusiness: "证券经纪、投行、资产管理、证券投资等。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，综合券商标的。" },
+      { stockCode: "601995", shortName: "中金公司", board: "沪市主板", industry: "证券Ⅱ", intro: "投资银行和机构业务特色鲜明的综合金融服务机构。", mainBusiness: "投资银行、股票业务、固定收益、财富管理和投资管理。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，投行和机构业务代表。" },
+      { stockCode: "601881", shortName: "中国银河", board: "沪市主板", industry: "证券Ⅱ", intro: "大型综合证券公司，分支机构和经纪业务基础较广。", mainBusiness: "财富管理、投行、机构业务、投资交易等。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，券商板块代表标的。" },
+      { stockCode: "000166", shortName: "申万宏源", board: "深市主板", industry: "证券Ⅱ", intro: "综合性证券金融控股平台。", mainBusiness: "证券、期货、资产管理、投资和研究服务。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，综合券商标的。" },
+      { stockCode: "002736", shortName: "国信证券", board: "深市主板", industry: "证券Ⅱ", intro: "综合证券公司，财富管理和投行业务具备市场影响力。", mainBusiness: "证券经纪、投行、资产管理和自营投资。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，券商板块代表。" },
+      { stockCode: "600958", shortName: "东方证券", board: "沪市主板", industry: "证券Ⅱ", intro: "上海国资背景综合证券公司。", mainBusiness: "证券销售交易、投资管理、经纪和投行业务。", relationType: "主营业务", confidence: "高", rationale: "东方财富证券Ⅱ BK0473 成分，综合券商标的。" },
+    ],
+  },
+];
+
 export function seedSemiconductorData(db: Database.Database) {
   const insertCategory = db.prepare(`
     insert into categories (name, parent_id, level, sort_order, aliases, description, industry)
@@ -147,6 +606,7 @@ export function seedSemiconductorData(db: Database.Database) {
       board,
       industry,
       region,
+      market_cap_band,
       intro,
       main_business
     )
@@ -157,6 +617,7 @@ export function seedSemiconductorData(db: Database.Database) {
       @board,
       @industry,
       @region,
+      @marketCapBand,
       @intro,
       @mainBusiness
     )
@@ -166,8 +627,33 @@ export function seedSemiconductorData(db: Database.Database) {
       board = excluded.board,
       industry = excluded.industry,
       region = excluded.region,
+      market_cap_band = excluded.market_cap_band,
       intro = excluded.intro,
       main_business = excluded.main_business,
+      updated_at = current_timestamp
+  `);
+
+  const upsertRelation = db.prepare(`
+    insert into company_category_relations (
+      stock_code,
+      category_id,
+      relation_type,
+      confidence,
+      rationale,
+      is_watchlist
+    )
+    values (
+      @stockCode,
+      @categoryId,
+      @relationType,
+      @confidence,
+      @rationale,
+      0
+    )
+    on conflict(stock_code, category_id) do update set
+      relation_type = excluded.relation_type,
+      confidence = excluded.confidence,
+      rationale = excluded.rationale,
       updated_at = current_timestamp
   `);
 
@@ -191,11 +677,34 @@ export function seedSemiconductorData(db: Database.Database) {
       updateCategory.run({ ...values, id });
     }
 
+    node.stocks?.forEach((stock) => {
+      insertCompany.run({
+        stockCode: stock.stockCode,
+        shortName: stock.shortName,
+        fullName: stock.fullName ?? "",
+        board: stock.board,
+        industry: stock.industry,
+        region: stock.region ?? "",
+        marketCapBand: stock.marketCapBand ?? "",
+        intro: stock.intro,
+        mainBusiness: stock.mainBusiness,
+      });
+      upsertRelation.run({
+        stockCode: stock.stockCode,
+        categoryId: id,
+        relationType: stock.relationType ?? "重要相关",
+        confidence: stock.confidence ?? "中",
+        rationale: stock.rationale,
+      });
+    });
+
     node.children?.forEach((child, index) => ensureCategory(child, id, level + 1, index));
+    return id;
   };
 
   const seed = db.transaction(() => {
     ensureCategory(semiconductorTree, null, 0, 0);
+    themeBoards.forEach((theme, index) => ensureCategory(theme, null, 0, index + 1));
     insertCompany.run({
       stockCode: "300346",
       shortName: "南大光电",
@@ -203,6 +712,7 @@ export function seedSemiconductorData(db: Database.Database) {
       board: "创业板",
       industry: "电子材料",
       region: "江苏",
+      marketCapBand: "",
       intro: "国内先进电子材料平台型企业，产品覆盖光刻胶配套材料、电子特气和前驱体材料等领域。",
       mainBusiness: "从事先进前驱体材料、电子特气、光刻胶及配套材料等半导体电子材料的研发、生产和销售。",
     });

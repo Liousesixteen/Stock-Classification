@@ -2,7 +2,7 @@
 
 import { Check, Plus, Search, Trash2, X } from "lucide-react";
 import { type FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CONFIDENCE_LEVELS, RELATION_TYPES } from "@/lib/domain/constants";
 import type { StockLookupProfile } from "@/lib/datasources/stockLookup";
 
@@ -40,6 +40,7 @@ type StockTableProps = {
 };
 
 type DraftStock = {
+  lookupQuery: string;
   stockCode: string;
   shortName: string;
   fullName: string;
@@ -56,6 +57,7 @@ type DraftStock = {
 };
 
 const emptyDraftStock: DraftStock = {
+  lookupQuery: "",
   stockCode: "",
   shortName: "",
   fullName: "",
@@ -92,6 +94,7 @@ export function StockTable({
   const [draftStock, setDraftStock] = useState<DraftStock>(emptyDraftStock);
   const [formError, setFormError] = useState("");
   const [lookupMessage, setLookupMessage] = useState("");
+  const [hasTouchedRationale, setHasTouchedRationale] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,48 +114,73 @@ export function StockTable({
     };
   }, [refreshKey, selectedCategoryId]);
 
-  const updateDraft = (patch: Partial<DraftStock>) => {
+  const updateDraft = (patch: Partial<DraftStock>, options: { clearLookupMessage?: boolean } = {}) => {
     setDraftStock((current) => ({ ...current, ...patch }));
     setFormError("");
-    setLookupMessage("");
+    if (options.clearLookupMessage ?? true) {
+      setLookupMessage("");
+    }
   };
 
-  const handleLookup = async () => {
-    const code = draftStock.stockCode.trim();
-    if (!code) {
-      setFormError("先填写股票代码");
-      return;
+  const buildRationale = useCallback((profile: StockLookupProfile) => {
+    const categoryName = data?.selectedCategory.name ?? "当前分类";
+    const descriptor = [profile.industry, profile.board].filter(Boolean).join(" / ");
+    return `纳入「${categoryName}」：${profile.shortName}${descriptor ? `（${descriptor}）` : ""}与该方向相关，后续可补公告、年报或研报证据。`;
+  }, [data?.selectedCategory.name]);
+
+  const applyLookupProfile = useCallback((profile: StockLookupProfile) => {
+    setDraftStock((current) => ({
+      ...current,
+      lookupQuery: current.lookupQuery || profile.shortName || profile.stockCode,
+      stockCode: profile.stockCode,
+      shortName: profile.shortName || current.shortName,
+      board: profile.board,
+      industry: profile.industry,
+      region: profile.region,
+      marketCapBand: profile.marketCapBand,
+      intro: profile.intro,
+      mainBusiness: profile.mainBusiness,
+      rationale: hasTouchedRationale ? current.rationale : buildRationale(profile),
+    }));
+    setLookupMessage(`已补全 · ${profile.sourceDetail}`);
+  }, [buildRationale, hasTouchedRationale]);
+
+  const lookupDraft = useCallback(async (rawQuery: string) => {
+    const query = rawQuery.trim();
+    if (!query) {
+      setFormError("先输入股票代码或名称");
+      return undefined;
     }
 
     setIsLookingUp(true);
     setFormError("");
-    setLookupMessage("");
 
     try {
-      const response = await fetch(`/api/stocks/lookup?code=${encodeURIComponent(code)}`);
+      const response = await fetch(`/api/stocks/lookup?query=${encodeURIComponent(query)}`);
       const result = (await response.json().catch(() => ({}))) as StockLookupResponse;
       if (!response.ok || !result.profile) {
-        setFormError(result.error ?? "自动补全失败，可继续手动填写");
-        return;
+        setFormError(result.error ?? "没有匹配到股票，请输入更完整的代码或名称");
+        return undefined;
       }
 
-      const profile = result.profile;
-      setDraftStock((current) => ({
-        ...current,
-        stockCode: profile.stockCode,
-        shortName: profile.shortName || current.shortName,
-        board: profile.board,
-        industry: profile.industry,
-        region: profile.region,
-        marketCapBand: profile.marketCapBand,
-        intro: profile.intro,
-        mainBusiness: profile.mainBusiness,
-      }));
-      setLookupMessage(`已补全 · ${profile.sourceDetail}`);
+      applyLookupProfile(result.profile);
+      return result.profile;
     } finally {
       setIsLookingUp(false);
     }
-  };
+  }, [applyLookupProfile]);
+
+  useEffect(() => {
+    if (!isAdding) return;
+    const query = draftStock.lookupQuery.trim();
+    if (query.length < 2) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void lookupDraft(query);
+    }, 450);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [draftStock.lookupQuery, isAdding, lookupDraft]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -162,23 +190,39 @@ export function StockTable({
       return;
     }
 
+    const lookedUpProfile = draftStock.stockCode && draftStock.shortName ? undefined : await lookupDraft(draftStock.lookupQuery);
+    const nextDraft = lookedUpProfile
+      ? {
+          ...draftStock,
+          stockCode: lookedUpProfile.stockCode,
+          shortName: lookedUpProfile.shortName,
+          board: lookedUpProfile.board,
+          industry: lookedUpProfile.industry,
+          region: lookedUpProfile.region,
+          marketCapBand: lookedUpProfile.marketCapBand,
+          intro: lookedUpProfile.intro,
+          mainBusiness: lookedUpProfile.mainBusiness,
+          rationale: draftStock.rationale.trim() || buildRationale(lookedUpProfile),
+        }
+      : draftStock;
+
     const payload = {
-      ...draftStock,
-      stockCode: draftStock.stockCode.trim(),
-      shortName: draftStock.shortName.trim(),
-      fullName: draftStock.fullName.trim(),
-      board: draftStock.board.trim(),
-      industry: draftStock.industry.trim(),
-      region: draftStock.region.trim(),
-      marketCapBand: draftStock.marketCapBand.trim(),
-      intro: draftStock.intro.trim(),
-      mainBusiness: draftStock.mainBusiness.trim(),
-      rationale: draftStock.rationale.trim(),
+      ...nextDraft,
+      stockCode: nextDraft.stockCode.trim(),
+      shortName: nextDraft.shortName.trim(),
+      fullName: nextDraft.fullName.trim(),
+      board: nextDraft.board.trim(),
+      industry: nextDraft.industry.trim(),
+      region: nextDraft.region.trim(),
+      marketCapBand: nextDraft.marketCapBand.trim(),
+      intro: nextDraft.intro.trim(),
+      mainBusiness: nextDraft.mainBusiness.trim(),
+      rationale: nextDraft.rationale.trim(),
       categoryId,
     };
 
     if (!payload.stockCode || !payload.shortName || !payload.rationale) {
-      setFormError("股票代码、公司简称和归类说明都要填写");
+      setFormError("请输入能匹配到 A 股的代码或名称");
       return;
     }
 
@@ -195,6 +239,7 @@ export function StockTable({
 
     setIsAdding(false);
     setDraftStock(emptyDraftStock);
+    setHasTouchedRationale(false);
     onSelectStock(payload.stockCode);
     onChanged();
   };
@@ -246,6 +291,7 @@ export function StockTable({
               setIsAdding((value) => !value);
               setFormError("");
               setLookupMessage("");
+              setHasTouchedRationale(false);
             }}
             className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-line px-3 text-sm font-semibold text-slate-700 transition hover:border-[#8fbda7] hover:bg-[#eef8f3] disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -256,36 +302,29 @@ export function StockTable({
 
         {isAdding ? (
           <form onSubmit={handleSubmit} className="mt-3 rounded-md border border-[#cfe2d8] bg-[#f7fbf9] p-3">
-            <div className="grid gap-2 md:grid-cols-[190px_minmax(120px,1fr)_120px_90px]">
+            <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_120px_90px]">
               <div className="grid gap-1 text-xs font-semibold text-slate-600">
-                <label htmlFor="stock-code-input">股票代码</label>
-                <div className="flex gap-1">
+                <label htmlFor="stock-query-input">股票代码或名称</label>
+                <div className="relative">
+                  <Search className={`pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isLookingUp ? "animate-pulse" : ""}`} />
                   <input
-                    id="stock-code-input"
-                    value={draftStock.stockCode}
-                    onChange={(event) => updateDraft({ stockCode: event.target.value })}
-                    className="h-9 min-w-0 flex-1 rounded border border-line bg-white px-2 text-sm font-normal outline-none focus:border-[#73b99a]"
+                    id="stock-query-input"
+                    value={draftStock.lookupQuery}
+                    onChange={(event) => {
+                      setHasTouchedRationale(false);
+                      updateDraft({
+                        ...emptyDraftStock,
+                        lookupQuery: event.target.value,
+                        relationType: draftStock.relationType,
+                        confidence: draftStock.confidence,
+                        isWatchlist: draftStock.isWatchlist,
+                      });
+                    }}
+                    placeholder="输入 600030 或 中信证券"
+                    className="h-9 w-full rounded border border-line bg-white pl-8 pr-2 text-sm font-normal outline-none focus:border-[#73b99a]"
                   />
-                  <button
-                    type="button"
-                    aria-label="自动补全股票资料"
-                    title="自动补全股票资料"
-                    disabled={isLookingUp}
-                    onClick={handleLookup}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded border border-line bg-white text-slate-600 transition hover:border-[#8fbda7] hover:bg-[#eef8f3] disabled:cursor-wait disabled:opacity-60"
-                  >
-                    <Search className={`h-4 w-4 ${isLookingUp ? "animate-pulse" : ""}`} />
-                  </button>
                 </div>
               </div>
-              <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                公司简称
-                <input
-                  value={draftStock.shortName}
-                  onChange={(event) => updateDraft({ shortName: event.target.value })}
-                  className="h-9 rounded border border-line bg-white px-2 text-sm font-normal outline-none focus:border-[#73b99a]"
-                />
-              </label>
               <label className="grid gap-1 text-xs font-semibold text-slate-600">
                 关系
                 <select
@@ -317,6 +356,16 @@ export function StockTable({
             </div>
             {profileChips.length > 0 || lookupMessage ? (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                {draftStock.stockCode ? (
+                  <span className="rounded-full border border-[#d7dde8] bg-white px-2 py-1 font-mono font-medium text-slate-700">
+                    {draftStock.stockCode}
+                  </span>
+                ) : null}
+                {draftStock.shortName ? (
+                  <span className="rounded-full border border-[#d7dde8] bg-white px-2 py-1 font-medium text-slate-700">
+                    {draftStock.shortName}
+                  </span>
+                ) : null}
                 {profileChips.map((chip) => (
                   <span key={chip} className="rounded-full border border-[#c8ded4] bg-white px-2 py-1 font-medium text-[#24694d]">
                     {chip}
@@ -329,7 +378,10 @@ export function StockTable({
               归类说明
               <textarea
                 value={draftStock.rationale}
-                onChange={(event) => updateDraft({ rationale: event.target.value })}
+                onChange={(event) => {
+                  setHasTouchedRationale(true);
+                  updateDraft({ rationale: event.target.value }, { clearLookupMessage: false });
+                }}
                 rows={2}
                 className="resize-none rounded border border-line bg-white px-2 py-2 text-sm font-normal outline-none focus:border-[#73b99a]"
               />

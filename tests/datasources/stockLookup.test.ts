@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eastmoneySecId, inferBoard, lookupStockProfile } from "@/lib/datasources/stockLookup";
+import { eastmoneySecId, inferBoard, lookupStockProfile, resolveStockQuery } from "@/lib/datasources/stockLookup";
 
 describe("stockLookup", () => {
   it("infers common A-share boards from the stock code prefix", () => {
@@ -45,6 +45,46 @@ describe("stockLookup", () => {
       mainBusiness: "电子化学品",
       source: "eastmoney",
     });
+  });
+
+  it("resolves an exact Chinese stock name from a local stock index before lookup", async () => {
+    const fetcher = async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get("secid")).toBe("1.688235");
+      return new Response(
+        JSON.stringify({
+          data: {
+            f57: "688235",
+            f58: "百济神州",
+            f116: 427_000_000_000,
+            f127: "化学制药",
+          },
+        }),
+      );
+    };
+
+    await expect(
+      lookupStockProfile("百济神州", fetcher, {
+        stockIndexItems: [["688235.SH", "688235", "百济神州", "baijishenzhou", "bjsz", [], "CN", "stock", true, 100]],
+      }),
+    ).resolves.toMatchObject({
+      stockCode: "688235",
+      shortName: "百济神州",
+      board: "科创板",
+      industry: "化学制药",
+    });
+  });
+
+  it("searches local stock index by code name and pinyin abbreviation", () => {
+    const stockIndexItems = [
+      ["688235.SH", "688235", "百济神州", "baijishenzhou", "bjsz", [], "CN", "stock", true, 100],
+      ["06160.HK", "06160", "百济神州", "baijishenzhou", "bjsz", [], "HK", "stock", true, 100],
+      ["300059.SZ", "300059", "东方财富", "dongfangcaifu", "dfcf", [], "CN", "stock", true, 100],
+    ];
+
+    expect(resolveStockQuery("百济神州", { stockIndexItems })?.displayCode).toBe("688235");
+    expect(resolveStockQuery("dfcf", { stockIndexItems })?.displayCode).toBe("300059");
+    expect(resolveStockQuery("06160", { stockIndexItems })).toBeUndefined();
   });
 
   it("throws a clear error when the upstream response does not contain stock data", async () => {

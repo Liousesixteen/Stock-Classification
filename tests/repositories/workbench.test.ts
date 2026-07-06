@@ -86,6 +86,25 @@ describe("workbench repositories", () => {
     expect(findCategoryByPath(db, ["半导体", "不存在"])).toBeUndefined();
   });
 
+  it("seeds requested theme boards with representative stock relations", () => {
+    const db = setupDb();
+    const expected = [
+      ["创新药", "688235", "百济神州"],
+      ["机器人", "300124", "汇川技术"],
+      ["商业航天", "601698", "中国卫通"],
+      ["证券", "600030", "中信证券"],
+    ] as const;
+
+    for (const [categoryName, stockCode, shortName] of expected) {
+      const category = findCategoryByPath(db, [categoryName]);
+      const rows = category ? listRelationsForCategory(db, category.id) : [];
+
+      expect(category?.name).toBe(categoryName);
+      expect(rows.some((row) => row.stockCode === stockCode && row.shortName === shortName)).toBe(true);
+      expect(rows.length).toBeGreaterThanOrEqual(8);
+    }
+  });
+
   it("preserves existing company intro and main business when upsert values are empty", () => {
     const db = setupDb();
 
