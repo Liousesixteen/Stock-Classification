@@ -33,3 +33,23 @@ export const categoryCreateInputSchema = z.object({
 export const categoryRenameInputSchema = z.object({
   name: categoryNameSchema,
 });
+
+export const companyProfileInputSchema = z.object({
+  shortName: z.string().trim().min(1, "公司简称不能为空"),
+  fullName: z.string().trim().default(""),
+  board: z.string().trim().default(""),
+  industry: z.string().trim().default(""),
+  region: z.string().trim().default(""),
+  marketCapBand: z.string().trim().default(""),
+  intro: z.string().trim().default(""),
+  mainBusiness: z.string().trim().default(""),
+});
+
+export const manualStockRelationInputSchema = companyProfileInputSchema.extend({
+  stockCode: stockCodeSchema,
+  categoryId: z.number().int().positive(),
+  relationType: z.enum(RELATION_TYPES).default("主营业务"),
+  confidence: z.enum(CONFIDENCE_LEVELS).default("中"),
+  rationale: z.string().trim().min(1, "归类说明不能为空"),
+  isWatchlist: z.boolean().default(false),
+});

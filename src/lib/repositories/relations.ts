@@ -69,6 +69,11 @@ export function upsertRelation(db: Database.Database, relation: RelationInput) {
   return row.id;
 }
 
+export function deleteRelation(db: Database.Database, relationId: number) {
+  const result = db.prepare("delete from company_category_relations where id = ?").run(relationId);
+  return result.changes;
+}
+
 export function setPrimaryEvidenceForRelation(db: Database.Database, relationId: number, evidenceId: number) {
   db.prepare(
     `

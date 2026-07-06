@@ -10,13 +10,14 @@ const chromiumExecutablePath =
 export default defineConfig({
   testDir: "./tests/e2e",
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
+    command:
+      "rm -f data/e2e-stock-classification.sqlite data/e2e-stock-classification.sqlite-shm data/e2e-stock-classification.sqlite-wal && STOCK_CLASSIFICATION_DB_PATH=data/e2e-stock-classification.sqlite npm run dev -- --port 3001",
+    url: "http://localhost:3001",
+    reuseExistingServer: false,
     timeout: 120000,
   },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3001",
     trace: "retain-on-failure",
   },
   projects: [

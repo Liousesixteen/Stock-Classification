@@ -73,6 +73,30 @@ export function upsertCompany(db: Database.Database, company: Company) {
   ).run(company);
 }
 
+export function updateCompanyProfile(db: Database.Database, company: Company) {
+  const result = db
+    .prepare(
+      `
+        update companies
+        set short_name = @shortName,
+            full_name = @fullName,
+            board = @board,
+            industry = @industry,
+            region = @region,
+            market_cap_band = @marketCapBand,
+            intro = @intro,
+            main_business = @mainBusiness,
+            updated_at = current_timestamp
+        where stock_code = @stockCode
+      `,
+    )
+    .run(company);
+
+  if (result.changes === 0) {
+    throw new Error("公司不存在");
+  }
+}
+
 export function getCompany(db: Database.Database, stockCode: string) {
   const row = db
     .prepare(

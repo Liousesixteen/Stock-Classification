@@ -48,12 +48,14 @@ export function Workbench() {
             selectedStockCode={selectedStockCode}
             searchQuery={searchQuery}
             onSelectStock={setSelectedStockCode}
+            onClearStock={() => setSelectedStockCode(null)}
+            onChanged={refresh}
             refreshKey={refreshKey}
           />
         </section>
 
         <aside className="min-h-[560px] rounded-lg border border-line bg-white p-4">
-          <CompanyDetails stockCode={selectedStockCode} refreshKey={refreshKey} />
+          <CompanyDetails stockCode={selectedStockCode} onChanged={refresh} refreshKey={refreshKey} />
         </aside>
       </div>
 

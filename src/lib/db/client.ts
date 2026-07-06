@@ -6,7 +6,7 @@ import { seedSemiconductorData } from "./seed";
 
 const appDbs = new Map<string, Database.Database>();
 
-export function getDatabase(dbPath = path.join(process.cwd(), "data", "stock-classification.sqlite")) {
+export function getDatabase(dbPath = process.env.STOCK_CLASSIFICATION_DB_PATH ?? path.join(process.cwd(), "data", "stock-classification.sqlite")) {
   const resolvedPath = path.resolve(dbPath);
   const cachedDb = appDbs.get(resolvedPath);
   if (cachedDb) return cachedDb;

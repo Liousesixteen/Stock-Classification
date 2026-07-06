@@ -10,8 +10,9 @@ import {
   renameCategory,
 } from "@/lib/repositories/categories";
 import { createEvidence, listEvidenceForRelation } from "@/lib/repositories/evidence";
-import { getCompany, upsertCompany } from "@/lib/repositories/companies";
+import { getCompany, updateCompanyProfile, upsertCompany } from "@/lib/repositories/companies";
 import {
+  deleteRelation,
   listRelationsForCategory,
   listRelationsForCompany,
   setPrimaryEvidenceForRelation,
@@ -146,6 +147,51 @@ describe("workbench repositories", () => {
       id: firstId,
       categoryName: "ArF 干法/浸没式光刻胶",
       isWatchlist: true,
+    });
+  });
+
+  it("deletes a relation from category and company views", () => {
+    const db = setupDb();
+    const category = findCategoryByPath(db, ["半导体", "材料", "光刻材料", "光刻胶", "ArF 干法/浸没式光刻胶"]);
+    upsertTestCompany(db, "300777", "测试材料");
+    const relationId = upsertRelation(db, {
+      stockCode: "300777",
+      categoryId: category!.id,
+      relationType: "重要相关",
+      confidence: "中",
+      rationale: "用于删除测试",
+      isWatchlist: false,
+    });
+
+    const deletedCount = deleteRelation(db, relationId);
+
+    expect(deletedCount).toBe(1);
+    expect(listRelationsForCategory(db, category!.id).some((row) => row.stockCode === "300777")).toBe(false);
+    expect(listRelationsForCompany(db, "300777")).toEqual([]);
+  });
+
+  it("updates company profile fields exactly from manual edits", () => {
+    const db = setupDb();
+    upsertTestCompany(db, "300778", "旧简称");
+
+    updateCompanyProfile(db, {
+      stockCode: "300778",
+      shortName: "新简称",
+      fullName: "新全称股份有限公司",
+      board: "创业板",
+      industry: "半导体材料",
+      region: "江苏",
+      marketCapBand: "100-300亿",
+      intro: "",
+      mainBusiness: "手动维护后的主营业务",
+      updatedAt: "",
+    });
+
+    expect(getCompany(db, "300778")).toMatchObject({
+      shortName: "新简称",
+      fullName: "新全称股份有限公司",
+      intro: "",
+      mainBusiness: "手动维护后的主营业务",
     });
   });
 
