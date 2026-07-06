@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { organizeStockFacts } from "@/lib/agents/classificationAgent";
+import { organizeStockFactsWithConfiguredAgent } from "@/lib/agents/classificationAgentProvider";
 import { lookupStockProfile } from "@/lib/datasources/stockLookup";
 import { getDatabase } from "@/lib/db/client";
 import { getCategoryById } from "@/lib/repositories/categories";
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     const profile = await lookupStockProfile(query);
-    const suggestion = organizeStockFacts({ profile, category });
+    const suggestion = await organizeStockFactsWithConfiguredAgent({ profile, category });
     return NextResponse.json({ profile, suggestion });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Agent 归类失败";

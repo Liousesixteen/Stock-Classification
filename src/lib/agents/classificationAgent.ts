@@ -11,8 +11,9 @@ export type ClassificationAgentResult = {
   confidence: ConfidenceLevel;
   rationale: string;
   sourceFacts: string[];
-  agentName: "rules-classification-agent";
-  agentVersion: "0.1.0";
+  agentName: "rules-classification-agent" | "deepseek-classification-agent";
+  agentVersion: string;
+  model?: string;
 };
 
 const DOMAIN_SIGNAL_TERMS: Record<string, string[]> = {
