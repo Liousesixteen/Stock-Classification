@@ -5,6 +5,7 @@ import { type FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CONFIDENCE_LEVELS, RELATION_TYPES } from "@/lib/domain/constants";
 import type { StockLookupProfile } from "@/lib/datasources/stockLookup";
+import type { ClassificationAgentResult } from "@/lib/agents/classificationAgent";
 
 type RelationRow = {
   id: number;
@@ -73,8 +74,9 @@ const emptyDraftStock: DraftStock = {
   isWatchlist: false,
 };
 
-type StockLookupResponse = {
+type StockAgentResponse = {
   profile?: StockLookupProfile;
+  suggestion?: ClassificationAgentResult;
   error?: string;
 };
 
@@ -122,13 +124,7 @@ export function StockTable({
     }
   };
 
-  const buildRationale = useCallback((profile: StockLookupProfile) => {
-    const categoryName = data?.selectedCategory.name ?? "当前分类";
-    const descriptor = [profile.industry, profile.board].filter(Boolean).join(" / ");
-    return `纳入「${categoryName}」：${profile.shortName}${descriptor ? `（${descriptor}）` : ""}与该方向相关，后续可补公告、年报或研报证据。`;
-  }, [data?.selectedCategory.name]);
-
-  const applyLookupProfile = useCallback((profile: StockLookupProfile) => {
+  const applyAgentResult = useCallback((profile: StockLookupProfile, suggestion?: ClassificationAgentResult) => {
     setDraftStock((current) => ({
       ...current,
       lookupQuery: current.lookupQuery || profile.shortName || profile.stockCode,
@@ -140,10 +136,12 @@ export function StockTable({
       marketCapBand: profile.marketCapBand,
       intro: profile.intro,
       mainBusiness: profile.mainBusiness,
-      rationale: hasTouchedRationale ? current.rationale : buildRationale(profile),
+      relationType: suggestion?.relationType ?? current.relationType,
+      confidence: suggestion?.confidence ?? current.confidence,
+      rationale: hasTouchedRationale ? current.rationale : (suggestion?.rationale ?? current.rationale),
     }));
-    setLookupMessage(`已补全 · ${profile.sourceDetail}`);
-  }, [buildRationale, hasTouchedRationale]);
+    setLookupMessage(`Agent 已整理 · ${suggestion?.agentName ?? profile.sourceDetail}`);
+  }, [hasTouchedRationale]);
 
   const lookupDraft = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
@@ -156,19 +154,25 @@ export function StockTable({
     setFormError("");
 
     try {
-      const response = await fetch(`/api/stocks/lookup?query=${encodeURIComponent(query)}`);
-      const result = (await response.json().catch(() => ({}))) as StockLookupResponse;
+      const categoryId = data?.selectedCategory.id ?? selectedCategoryId;
+      if (!categoryId) {
+        setFormError("请先选择一个分类");
+        return undefined;
+      }
+
+      const response = await fetch(`/api/agents/classify?query=${encodeURIComponent(query)}&categoryId=${categoryId}`);
+      const result = (await response.json().catch(() => ({}))) as StockAgentResponse;
       if (!response.ok || !result.profile) {
         setFormError(result.error ?? "没有匹配到股票，请输入更完整的代码或名称");
         return undefined;
       }
 
-      applyLookupProfile(result.profile);
-      return result.profile;
+      applyAgentResult(result.profile, result.suggestion);
+      return result;
     } finally {
       setIsLookingUp(false);
     }
-  }, [applyLookupProfile]);
+  }, [applyAgentResult, data?.selectedCategory.id, selectedCategoryId]);
 
   useEffect(() => {
     if (!isAdding) return;
@@ -190,19 +194,21 @@ export function StockTable({
       return;
     }
 
-    const lookedUpProfile = draftStock.stockCode && draftStock.shortName ? undefined : await lookupDraft(draftStock.lookupQuery);
-    const nextDraft = lookedUpProfile
+    const lookedUpResult = draftStock.stockCode && draftStock.shortName ? undefined : await lookupDraft(draftStock.lookupQuery);
+    const nextDraft = lookedUpResult?.profile
       ? {
           ...draftStock,
-          stockCode: lookedUpProfile.stockCode,
-          shortName: lookedUpProfile.shortName,
-          board: lookedUpProfile.board,
-          industry: lookedUpProfile.industry,
-          region: lookedUpProfile.region,
-          marketCapBand: lookedUpProfile.marketCapBand,
-          intro: lookedUpProfile.intro,
-          mainBusiness: lookedUpProfile.mainBusiness,
-          rationale: draftStock.rationale.trim() || buildRationale(lookedUpProfile),
+          stockCode: lookedUpResult.profile.stockCode,
+          shortName: lookedUpResult.profile.shortName,
+          board: lookedUpResult.profile.board,
+          industry: lookedUpResult.profile.industry,
+          region: lookedUpResult.profile.region,
+          marketCapBand: lookedUpResult.profile.marketCapBand,
+          intro: lookedUpResult.profile.intro,
+          mainBusiness: lookedUpResult.profile.mainBusiness,
+          relationType: lookedUpResult.suggestion?.relationType ?? draftStock.relationType,
+          confidence: lookedUpResult.suggestion?.confidence ?? draftStock.confidence,
+          rationale: draftStock.rationale.trim() || lookedUpResult.suggestion?.rationale || "",
         }
       : draftStock;
 

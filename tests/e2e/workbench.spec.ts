@@ -35,7 +35,7 @@ test("adds edits and removes a stock relation manually", async ({ page }) => {
   const shortName = `测试标的${stockCode.slice(-2)}`;
   const updatedName = `已编辑标的${stockCode.slice(-2)}`;
 
-  await page.route("**/api/stocks/lookup?query=*", async (route) => {
+  await page.route("**/api/agents/classify?query=*", async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.searchParams.get("query") !== stockCode) {
       await route.continue();
@@ -56,6 +56,14 @@ test("adds edits and removes a stock relation manually", async ({ page }) => {
           mainBusiness: "测试主营业务",
           source: "eastmoney",
           sourceDetail: "测试股票索引",
+        },
+        suggestion: {
+          relationType: "重要相关",
+          confidence: "中",
+          rationale: `Agent 已整理：${shortName} 纳入当前分类。`,
+          sourceFacts: [`代码：${stockCode}`, `简称：${shortName}`, "行业：测试行业"],
+          agentName: "rules-classification-agent",
+          agentVersion: "0.1.0",
         },
       }),
     });
@@ -86,7 +94,7 @@ test("adds edits and removes a stock relation manually", async ({ page }) => {
 });
 
 test("auto fills stock profile from a stock name while adding a relation", async ({ page }) => {
-  await page.route("**/api/stocks/lookup?query=*", async (route) => {
+  await page.route("**/api/agents/classify?query=*", async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.searchParams.get("query") !== "百济神州") {
       await route.continue();
@@ -108,6 +116,14 @@ test("auto fills stock profile from a stock name while adding a relation", async
           source: "eastmoney",
           sourceDetail: "东方财富 push2 基础资料",
         },
+        suggestion: {
+          relationType: "重要相关",
+          confidence: "中",
+          rationale: "Agent 已整理：百济神州（化学制药 / 科创板）与创新药方向相关，后续需要补充公告、年报或研报证据。",
+          sourceFacts: ["代码：688235", "简称：百济神州", "行业：化学制药"],
+          agentName: "rules-classification-agent",
+          agentVersion: "0.1.0",
+        },
       }),
     });
   });
@@ -120,5 +136,5 @@ test("auto fills stock profile from a stock name while adding a relation", async
   await expect(page.getByText("百济神州", { exact: true })).toBeVisible();
   await expect(page.getByText("科创板", { exact: true })).toBeVisible();
   await expect(page.getByText("化学制药", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("归类说明")).toHaveValue(/百济神州/);
+  await expect(page.getByLabel("归类说明")).toHaveValue(/Agent 已整理：百济神州/);
 });
