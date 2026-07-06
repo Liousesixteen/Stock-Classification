@@ -59,3 +59,36 @@ test("adds edits and removes a stock relation manually", async ({ page }) => {
   await page.getByRole("button", { name: `移除 ${stockCode} 与当前分类的关系` }).click();
   await expect(page.getByText(stockCode)).toHaveCount(0);
 });
+
+test("auto fills stock profile while adding a relation", async ({ page }) => {
+  await page.route("**/api/stocks/lookup?code=300346", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        profile: {
+          stockCode: "300346",
+          shortName: "南大光电",
+          board: "创业板",
+          industry: "电子化学品",
+          region: "江苏",
+          marketCapBand: "100-300亿",
+          intro: "东财基础资料显示，南大光电属于电子化学品行业，上市板块为创业板。",
+          mainBusiness: "电子化学品",
+          source: "eastmoney",
+          sourceDetail: "东方财富 push2 基础资料",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "添加标的" }).click();
+  await page.getByLabel("股票代码").fill("300346");
+  await page.getByRole("button", { name: "自动补全股票资料" }).click();
+
+  await expect(page.getByLabel("公司简称")).toHaveValue("南大光电");
+  await expect(page.getByText("创业板", { exact: true })).toBeVisible();
+  await expect(page.getByText("电子化学品", { exact: true })).toBeVisible();
+  await expect(page.getByText("100-300亿", { exact: true })).toBeVisible();
+});

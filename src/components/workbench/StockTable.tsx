@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { Check, Plus, Search, Trash2, X } from "lucide-react";
 import { type FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { CONFIDENCE_LEVELS, RELATION_TYPES } from "@/lib/domain/constants";
+import type { StockLookupProfile } from "@/lib/datasources/stockLookup";
 
 type RelationRow = {
   id: number;
@@ -41,6 +42,13 @@ type StockTableProps = {
 type DraftStock = {
   stockCode: string;
   shortName: string;
+  fullName: string;
+  board: string;
+  industry: string;
+  region: string;
+  marketCapBand: string;
+  intro: string;
+  mainBusiness: string;
   relationType: string;
   confidence: string;
   rationale: string;
@@ -50,10 +58,22 @@ type DraftStock = {
 const emptyDraftStock: DraftStock = {
   stockCode: "",
   shortName: "",
+  fullName: "",
+  board: "",
+  industry: "",
+  region: "",
+  marketCapBand: "",
+  intro: "",
+  mainBusiness: "",
   relationType: "主营业务",
   confidence: "中",
   rationale: "",
   isWatchlist: false,
+};
+
+type StockLookupResponse = {
+  profile?: StockLookupProfile;
+  error?: string;
 };
 
 export function StockTable({
@@ -68,8 +88,10 @@ export function StockTable({
   const [data, setData] = useState<WorkbenchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(false);
   const [draftStock, setDraftStock] = useState<DraftStock>(emptyDraftStock);
   const [formError, setFormError] = useState("");
+  const [lookupMessage, setLookupMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -92,6 +114,44 @@ export function StockTable({
   const updateDraft = (patch: Partial<DraftStock>) => {
     setDraftStock((current) => ({ ...current, ...patch }));
     setFormError("");
+    setLookupMessage("");
+  };
+
+  const handleLookup = async () => {
+    const code = draftStock.stockCode.trim();
+    if (!code) {
+      setFormError("先填写股票代码");
+      return;
+    }
+
+    setIsLookingUp(true);
+    setFormError("");
+    setLookupMessage("");
+
+    try {
+      const response = await fetch(`/api/stocks/lookup?code=${encodeURIComponent(code)}`);
+      const result = (await response.json().catch(() => ({}))) as StockLookupResponse;
+      if (!response.ok || !result.profile) {
+        setFormError(result.error ?? "自动补全失败，可继续手动填写");
+        return;
+      }
+
+      const profile = result.profile;
+      setDraftStock((current) => ({
+        ...current,
+        stockCode: profile.stockCode,
+        shortName: profile.shortName || current.shortName,
+        board: profile.board,
+        industry: profile.industry,
+        region: profile.region,
+        marketCapBand: profile.marketCapBand,
+        intro: profile.intro,
+        mainBusiness: profile.mainBusiness,
+      }));
+      setLookupMessage(`已补全 · ${profile.sourceDetail}`);
+    } finally {
+      setIsLookingUp(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -106,6 +166,13 @@ export function StockTable({
       ...draftStock,
       stockCode: draftStock.stockCode.trim(),
       shortName: draftStock.shortName.trim(),
+      fullName: draftStock.fullName.trim(),
+      board: draftStock.board.trim(),
+      industry: draftStock.industry.trim(),
+      region: draftStock.region.trim(),
+      marketCapBand: draftStock.marketCapBand.trim(),
+      intro: draftStock.intro.trim(),
+      mainBusiness: draftStock.mainBusiness.trim(),
       rationale: draftStock.rationale.trim(),
       categoryId,
     };
@@ -161,6 +228,8 @@ export function StockTable({
     );
   }, [data?.relations, searchQuery]);
 
+  const profileChips = [draftStock.board, draftStock.industry, draftStock.region, draftStock.marketCapBand].filter(Boolean);
+
   return (
     <div className="flex min-h-[620px] flex-1 flex-col rounded-lg border border-line bg-white">
       <div className="border-b border-line p-4">
@@ -176,6 +245,7 @@ export function StockTable({
             onClick={() => {
               setIsAdding((value) => !value);
               setFormError("");
+              setLookupMessage("");
             }}
             className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-line px-3 text-sm font-semibold text-slate-700 transition hover:border-[#8fbda7] hover:bg-[#eef8f3] disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -186,15 +256,28 @@ export function StockTable({
 
         {isAdding ? (
           <form onSubmit={handleSubmit} className="mt-3 rounded-md border border-[#cfe2d8] bg-[#f7fbf9] p-3">
-            <div className="grid gap-2 md:grid-cols-[110px_minmax(120px,1fr)_120px_90px]">
-              <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                股票代码
-                <input
-                  value={draftStock.stockCode}
-                  onChange={(event) => updateDraft({ stockCode: event.target.value })}
-                  className="h-9 rounded border border-line bg-white px-2 text-sm font-normal outline-none focus:border-[#73b99a]"
-                />
-              </label>
+            <div className="grid gap-2 md:grid-cols-[190px_minmax(120px,1fr)_120px_90px]">
+              <div className="grid gap-1 text-xs font-semibold text-slate-600">
+                <label htmlFor="stock-code-input">股票代码</label>
+                <div className="flex gap-1">
+                  <input
+                    id="stock-code-input"
+                    value={draftStock.stockCode}
+                    onChange={(event) => updateDraft({ stockCode: event.target.value })}
+                    className="h-9 min-w-0 flex-1 rounded border border-line bg-white px-2 text-sm font-normal outline-none focus:border-[#73b99a]"
+                  />
+                  <button
+                    type="button"
+                    aria-label="自动补全股票资料"
+                    title="自动补全股票资料"
+                    disabled={isLookingUp}
+                    onClick={handleLookup}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded border border-line bg-white text-slate-600 transition hover:border-[#8fbda7] hover:bg-[#eef8f3] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Search className={`h-4 w-4 ${isLookingUp ? "animate-pulse" : ""}`} />
+                  </button>
+                </div>
+              </div>
               <label className="grid gap-1 text-xs font-semibold text-slate-600">
                 公司简称
                 <input
@@ -232,6 +315,16 @@ export function StockTable({
                 </select>
               </label>
             </div>
+            {profileChips.length > 0 || lookupMessage ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                {profileChips.map((chip) => (
+                  <span key={chip} className="rounded-full border border-[#c8ded4] bg-white px-2 py-1 font-medium text-[#24694d]">
+                    {chip}
+                  </span>
+                ))}
+                {lookupMessage ? <span className="text-muted">{lookupMessage}</span> : null}
+              </div>
+            ) : null}
             <label className="mt-2 grid gap-1 text-xs font-semibold text-slate-600">
               归类说明
               <textarea
