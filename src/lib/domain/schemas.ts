@@ -22,3 +22,14 @@ export const evidenceInputSchema = z.object({
   credibility: z.enum(CONFIDENCE_LEVELS).default("中"),
   isExpired: z.boolean().default(false),
 });
+
+export const categoryNameSchema = z.string().trim().min(1, "分类名称不能为空").max(80, "分类名称最多 80 个字符");
+
+export const categoryCreateInputSchema = z.object({
+  name: categoryNameSchema,
+  parentId: z.number().int().positive().nullable().optional(),
+});
+
+export const categoryRenameInputSchema = z.object({
+  name: categoryNameSchema,
+});

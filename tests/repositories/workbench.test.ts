@@ -2,7 +2,13 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { migrate } from "@/lib/db/schema";
 import { seedSemiconductorData } from "@/lib/db/seed";
-import { getCategoryTree, findCategoryByPath } from "@/lib/repositories/categories";
+import {
+  createCategory,
+  deleteCategoryBranch,
+  findCategoryByPath,
+  getCategoryTree,
+  renameCategory,
+} from "@/lib/repositories/categories";
 import { createEvidence, listEvidenceForRelation } from "@/lib/repositories/evidence";
 import { getCompany, upsertCompany } from "@/lib/repositories/companies";
 import {
@@ -14,6 +20,7 @@ import {
 
 function setupDb() {
   const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
   migrate(db);
   seedSemiconductorData(db);
   return db;
@@ -210,5 +217,46 @@ describe("workbench repositories", () => {
     });
     expect(relationRow.sourceType).toBe("公告");
     expect(relationRow.sourceTitle).toBe("晶瑞电材业务公告");
+  });
+
+  it("creates and renames custom category groups under the selected parent", () => {
+    const db = setupDb();
+    const material = findCategoryByPath(db, ["半导体", "材料"]);
+
+    const customId = createCategory(db, {
+      name: "先进封装材料",
+      parentId: material!.id,
+    });
+    renameCategory(db, customId, "先进封装材料-自定义");
+
+    const custom = findCategoryByPath(db, ["半导体", "材料", "先进封装材料-自定义"]);
+
+    expect(custom).toMatchObject({
+      id: customId,
+      name: "先进封装材料-自定义",
+      parentId: material!.id,
+      level: material!.level + 1,
+    });
+  });
+
+  it("deletes a custom category branch from leaves to parent", () => {
+    const db = setupDb();
+    const material = findCategoryByPath(db, ["半导体", "材料"]);
+    const parentId = createCategory(db, { name: "临时材料组", parentId: material!.id });
+    const childId = createCategory(db, { name: "临时子组", parentId });
+
+    const deletedCount = deleteCategoryBranch(db, parentId);
+
+    expect(deletedCount).toBe(2);
+    expect(db.prepare("select id from categories where id in (?, ?)").all(parentId, childId)).toEqual([]);
+  });
+
+  it("rejects duplicate sibling category names", () => {
+    const db = setupDb();
+    const material = findCategoryByPath(db, ["半导体", "材料"]);
+
+    createCategory(db, { name: "自定义材料", parentId: material!.id });
+
+    expect(() => createCategory(db, { name: "自定义材料", parentId: material!.id })).toThrow("同级分类已存在");
   });
 });

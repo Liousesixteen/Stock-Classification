@@ -32,7 +32,13 @@ export function Workbench() {
 
       <div className="grid min-h-[720px] grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(520px,1fr)_420px]">
         <aside className="min-h-[560px] rounded-lg border border-line bg-white p-4">
-          <ClassificationTree selectedCategoryId={selectedCategoryId} onSelect={setSelectedCategoryId} refreshKey={refreshKey} />
+          <ClassificationTree
+            selectedCategoryId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
+            onClearSelection={() => setSelectedCategoryId(null)}
+            onChanged={refresh}
+            refreshKey={refreshKey}
+          />
         </aside>
 
         <section className="flex min-w-0 flex-col gap-3">
