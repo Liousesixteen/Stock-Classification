@@ -70,4 +70,23 @@ describe("listIndustryGraphRelations", () => {
       }),
     );
   });
+
+  it("omits relations attached to inactive categories", () => {
+    const db = setupDb();
+    db.prepare(
+      `
+        update categories
+        set is_active = 0
+        where id = (
+          select category_id
+          from company_category_relations
+          where stock_code = ?
+        )
+      `,
+    ).run("688235");
+
+    const rows = listIndustryGraphRelations(db);
+
+    expect(rows.some((row) => row.stockCode === "688235")).toBe(false);
+  });
 });

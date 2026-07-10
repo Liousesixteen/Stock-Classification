@@ -14,6 +14,7 @@ export function listIndustryGraphRelations(db: Database.Database): IndustryGraph
           count(e.id) as evidenceCount
         from company_category_relations r
         join companies c on c.stock_code = r.stock_code
+        join categories category on category.id = r.category_id and category.is_active = 1
         left join evidences e on e.relation_id = r.id and e.is_expired = 0
         group by r.id
         order by r.category_id, r.stock_code
