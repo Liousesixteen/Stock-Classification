@@ -30,15 +30,25 @@ export type IndustryGraphNode =
       layoutSeed: number;
     };
 
-export type IndustryGraphEdge = {
-  id: string;
-  source: string;
-  target: string;
-  kind: "hierarchy" | "relation";
-  relationType?: RelationType;
-  confidence?: ConfidenceLevel;
-  evidenceCount: number;
-};
+export type IndustryGraphEdge =
+  | {
+      id: string;
+      source: string;
+      target: string;
+      kind: "hierarchy";
+      relationType?: never;
+      confidence?: never;
+      evidenceCount: number;
+    }
+  | {
+      id: string;
+      source: string;
+      target: string;
+      kind: "relation";
+      relationType: RelationType;
+      confidence: ConfidenceLevel;
+      evidenceCount: number;
+    };
 
 export type IndustryGraphPayload = {
   nodes: IndustryGraphNode[];

@@ -1,5 +1,31 @@
-import type { CategoryNode } from "@/lib/domain/types";
+import type { CategoryNode, ConfidenceLevel, RelationType } from "@/lib/domain/types";
 import type { IndustryGraphNode, IndustryGraphPayload, IndustryGraphRelationRow } from "./types";
+
+const RELATION_TYPE_PRIORITY: Record<RelationType, number> = {
+  主营业务: 4,
+  重要相关: 3,
+  "概念/少量布局": 2,
+  待验证: 1,
+};
+
+const CONFIDENCE_PRIORITY: Record<ConfidenceLevel, number> = {
+  高: 3,
+  中: 2,
+  低: 1,
+};
+
+type CompanyNode = Extract<IndustryGraphNode, { kind: "company" }>;
+
+function outranksCompanyMetadata(relation: IndustryGraphRelationRow, company: CompanyNode) {
+  const relationTypeDifference =
+    RELATION_TYPE_PRIORITY[relation.relationType] - RELATION_TYPE_PRIORITY[company.relationType];
+
+  if (relationTypeDifference !== 0) {
+    return relationTypeDifference > 0;
+  }
+
+  return CONFIDENCE_PRIORITY[relation.confidence] > CONFIDENCE_PRIORITY[company.confidence];
+}
 
 export function stableSeed(value: string) {
   let hash = 2166136261;
@@ -18,7 +44,7 @@ export function buildIndustryGraph(
 ): IndustryGraphPayload {
   const nodes: IndustryGraphNode[] = [];
   const edges: IndustryGraphPayload["edges"] = [];
-  const companies = new Map<string, Extract<IndustryGraphNode, { kind: "company" }>>();
+  const companies = new Map<string, CompanyNode>();
 
   const visit = (category: CategoryNode) => {
     const categoryId = `category:${category.id}`;
@@ -56,8 +82,13 @@ export function buildIndustryGraph(
 
     if (existing) {
       existing.evidenceCount += relation.evidenceCount;
+
+      if (outranksCompanyMetadata(relation, existing)) {
+        existing.relationType = relation.relationType;
+        existing.confidence = relation.confidence;
+      }
     } else {
-      const company: Extract<IndustryGraphNode, { kind: "company" }> = {
+      const company: CompanyNode = {
         id: companyId,
         kind: "company",
         label: relation.shortName,

@@ -50,26 +50,65 @@ describe("buildIndustryGraph", () => {
       },
     ]);
 
-    expect(graph.nodes.map((node) => node.id)).toEqual([
-      "category:1",
-      "category:2",
-      "company:002156",
+    expect(graph.nodes).toEqual([
+      {
+        id: "category:1",
+        kind: "category",
+        label: "半导体",
+        categoryId: 1,
+        parentId: null,
+        level: 0,
+        layoutSeed: 898631264,
+      },
+      {
+        id: "category:2",
+        kind: "category",
+        label: "封测",
+        categoryId: 2,
+        parentId: 1,
+        level: 1,
+        layoutSeed: 948964121,
+      },
+      {
+        id: "company:002156",
+        kind: "company",
+        label: "通富微电",
+        stockCode: "002156",
+        relationType: "主营业务",
+        confidence: "高",
+        evidenceCount: 12,
+        layoutSeed: 19726508,
+      },
     ]);
-    expect(graph.edges.map((edge) => edge.id)).toEqual([
-      "category:1->category:2",
-      "category:2->company:002156",
+    expect(graph.edges).toEqual([
+      {
+        id: "category:1->category:2",
+        source: "category:1",
+        target: "category:2",
+        kind: "hierarchy",
+        evidenceCount: 0,
+      },
+      {
+        id: "category:2->company:002156",
+        source: "category:2",
+        target: "company:002156",
+        kind: "relation",
+        relationType: "主营业务",
+        confidence: "高",
+        evidenceCount: 12,
+      },
     ]);
     expect(graph.stats).toEqual({ categoryCount: 2, companyCount: 1, evidenceCount: 12 });
   });
 
-  it("deduplicates companies while retaining every relation and summing evidence", () => {
-    const graph = buildIndustryGraph(categories, [
+  it("selects canonical company metadata independent of relation input order", () => {
+    const relations = [
       {
         categoryId: 1,
         stockCode: "002156",
         shortName: "通富微电",
         relationType: "重要相关",
-        confidence: "中",
+        confidence: "高",
         evidenceCount: 2,
       },
       {
@@ -77,16 +116,59 @@ describe("buildIndustryGraph", () => {
         stockCode: "002156",
         shortName: "通富微电",
         relationType: "主营业务",
-        confidence: "高",
+        confidence: "低",
         evidenceCount: 3,
       },
-    ]);
+      {
+        categoryId: 1,
+        stockCode: "002156",
+        shortName: "通富微电",
+        relationType: "主营业务",
+        confidence: "高",
+        evidenceCount: 4,
+      },
+    ] as const;
 
-    const companyNodes = graph.nodes.filter((node) => node.kind === "company");
+    const forwardGraph = buildIndustryGraph(categories, [...relations]);
+    const reversedGraph = buildIndustryGraph(categories, [...relations].reverse());
+    const forwardCompany = forwardGraph.nodes.find((node) => node.kind === "company");
+    const reversedCompany = reversedGraph.nodes.find((node) => node.kind === "company");
 
-    expect(companyNodes).toHaveLength(1);
-    expect(companyNodes[0].evidenceCount).toBe(5);
-    expect(graph.edges.filter((edge) => edge.kind === "relation")).toHaveLength(2);
-    expect(graph.stats).toEqual({ categoryCount: 2, companyCount: 1, evidenceCount: 5 });
+    expect(forwardCompany).toEqual({
+      id: "company:002156",
+      kind: "company",
+      label: "通富微电",
+      stockCode: "002156",
+      relationType: "主营业务",
+      confidence: "高",
+      evidenceCount: 9,
+      layoutSeed: 19726508,
+    });
+    expect(reversedCompany).toEqual(forwardCompany);
+    expect(forwardGraph.edges.filter((edge) => edge.kind === "relation")).toHaveLength(3);
+    expect(reversedGraph.edges.filter((edge) => edge.kind === "relation")).toHaveLength(3);
+    expect(forwardGraph.stats).toEqual({ categoryCount: 2, companyCount: 1, evidenceCount: 9 });
+    expect(reversedGraph.stats).toEqual(forwardGraph.stats);
+  });
+
+  it("does not mutate category or relation inputs", () => {
+    const categoryInput = structuredClone(categories);
+    const relationInput = [
+      {
+        categoryId: 2,
+        stockCode: "002156",
+        shortName: "通富微电",
+        relationType: "主营业务" as const,
+        confidence: "高" as const,
+        evidenceCount: 12,
+      },
+    ];
+    const categorySnapshot = structuredClone(categoryInput);
+    const relationSnapshot = structuredClone(relationInput);
+
+    buildIndustryGraph(categoryInput, relationInput);
+
+    expect(categoryInput).toEqual(categorySnapshot);
+    expect(relationInput).toEqual(relationSnapshot);
   });
 });
