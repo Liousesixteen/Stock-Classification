@@ -49,6 +49,8 @@ const evidence: Evidence = {
   excerpt: "公司光刻胶产品处于客户验证和销售阶段。",
   credibility: "高",
   isExpired: false,
+  verificationStatus: "unverified",
+  verifiedAt: "",
 };
 
 function fact(fieldKey: string, value: unknown, overrides: Partial<CompanyFieldFact> = {}): CompanyFieldFact {
@@ -128,6 +130,7 @@ describe("company dossier quality", () => {
     });
 
     expect(result.fieldCoverageScore).toBeLessThan(25);
+    expect(result.evidenceCoverageScore).toBe(0);
     expect(result.reliabilityLabel).toBe("资料不足");
     expect(result.failedFields).toBe(1);
     expect(result.staleFields).toBe(1);
@@ -151,6 +154,7 @@ describe("company dossier quality", () => {
     const after = assessCompanyDossierQuality({ ...input, relations: [{ ...relation, verificationStatus: "verified" as const }] });
 
     expect(after.evidenceCoverageScore).toBeGreaterThan(before.evidenceCoverageScore);
+    expect(before.evidenceCoverageScore).toBe(0);
     expect(after.overallScore).toBeGreaterThanOrEqual(before.overallScore);
   });
 });

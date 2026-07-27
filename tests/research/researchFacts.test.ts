@@ -18,8 +18,8 @@ describe("universal research facts", () => {
       `select id from company_category_relations where category_id = ? order by id limit 1`,
     ).get(category.categoryId) as { id: number };
     db.prepare(
-      `insert into evidences (relation_id, source_type, title, source_date, excerpt, credibility)
-       values (?, '公告', '产业验证公告', '2026-07-20', '公司披露了相关业务进展。', '高')`,
+      `insert into evidences (relation_id, source_type, title, source_date, url, excerpt, credibility)
+       values (?, '公告', '产业验证公告', '2026-07-20', 'https://example.com/notice', '公司披露了相关业务进展。', '高')`,
     ).run(relation.id);
 
     const facts = buildIndustryResearchFacts(db, category.categoryId);

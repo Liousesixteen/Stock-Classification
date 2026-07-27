@@ -458,7 +458,7 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
             <button type="button" className="report-add-section">+ 新增章节</button>
           </aside>
 
-          <main className="report-editor">
+          <section className="report-editor" aria-label="研报编辑器">
             <section className="report-generation-bar">
               <div className="ai-report-template-row">
                 <button type="button" className={reportType === "company" ? "is-active" : ""} onClick={() => setReportType("company")}><strong>公司深度报告</strong><span>业务、产业链、竞争力与风险</span></button>
@@ -474,7 +474,7 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
                 <ReportPreview markdown={report.markdown} />
               </section>
             ) : <div className="report-editor-empty"><FileText /><strong>从研究资料生成可编辑研报</strong><p>选择报告类型并补充写作重点，系统将按章节组织观点、数据、风险和证据边界。</p></div>}
-          </main>
+          </section>
 
           <aside className="report-quality">
             <section><header><span>引用与质检</span><Quote /></header><div className="report-source-stat"><b>{result?.stages.length ?? 0}</b><span>智能体结论</span></div><div className="report-source-stat"><b>{report ? 1 : 0}</b><span>当前报告</span></div></section>
@@ -585,7 +585,7 @@ function AiResearchWorkspace({
         </section>
       </aside>
 
-      <main className="ai-chat-stage">
+      <section className="ai-chat-stage" aria-label="AI 研究对话">
         <nav className="ai-research-modes" aria-label="研究模式"><button type="button" className={depth === "quick" ? "is-active" : ""} onClick={() => onDepthChange("quick")}><Sparkles />快速问答</button><button type="button" className={depth === "standard" ? "is-active" : ""} onClick={() => onDepthChange("standard")}><Network />标准研究</button><button type="button" className={depth === "deep" ? "is-active" : ""} onClick={() => onDepthChange("deep")}><Gauge />深度研究</button><button type="button" disabled title="结构化数据分析将在后续版本接入"><BarChart3 />数据分析</button></nav>
 
         <section className="ai-chat-scroll">
@@ -615,11 +615,11 @@ function AiResearchWorkspace({
         <section className="ai-research-progress"><header><b>深度研究进度 {researchProgress}/6</b><button type="button">收起 <ChevronRight /></button></header><div className="ai-progress-line">{["问题理解", "信息检索", "证据分析", "观点生成", "报告整合", "质量校验"].map((item, index) => <span key={item} className={index < researchProgress ? "is-done" : index === researchProgress ? "is-current" : ""}><i>{index < researchProgress ? <Check /> : index + 1}</i><b>{item}</b></span>)}</div></section>
 
         <section className="ai-composer">
-          <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} placeholder="输入任何研究问题，或使用 @ 引用资料 / 公司 / 指标" />
-          <footer><div><button type="button"><AtSign />引用</button><button type="button"><Paperclip />附件</button><button type="button"><BarChart3 />指标</button><button type="button"><Table2 />图表</button><button type="button" title="联网数据需先进入 Provider"><Globe2 />数据源</button></div><span>证据约束研究引擎</span><button type="button" className="ai-composer-send" onClick={onLaunchResearch} disabled={running || !question.trim()}>{running ? <LoaderCircle className="animate-spin" /> : <Send />}</button></footer>
+          <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} placeholder="输入任何研究问题，或使用 @ 引用资料 / 公司 / 指标" aria-label="研究问题" />
+          <footer><div><button type="button"><AtSign />引用</button><button type="button"><Paperclip />附件</button><button type="button"><BarChart3 />指标</button><button type="button"><Table2 />图表</button><button type="button" title="联网数据需先进入 Provider"><Globe2 />数据源</button></div><span>证据约束研究引擎</span><button type="button" className="ai-composer-send" aria-label={running ? "研究运行中" : "开始研究"} onClick={onLaunchResearch} disabled={running || !question.trim()}>{running ? <LoaderCircle className="animate-spin" /> : <Send />}</button></footer>
         </section>
         <small className="ai-disclaimer">内容由 AI 生成，仅供参考，请结合专业判断。免责声明</small>
-      </main>
+      </section>
 
       <aside className="ai-evidence-rail">
         <header><h3>研究上下文与证据</h3><button type="button">收起 <ChevronRight /></button></header>
@@ -627,7 +627,7 @@ function AiResearchWorkspace({
         <EvidenceGroup title="支持结论" count={groundedFindings.length} tone="support" items={groundedFindings.slice(0, 5)} empty="尚无有证据支持的结论" />
         <EvidenceGroup title="风险与反证" count={result?.risks.length ?? 0} tone="counter" items={(result?.risks ?? []).slice(0, 5)} empty="尚未完成风险审查" />
         <EvidenceGroup title="待核验证据" count={result?.verificationQuestions.length ?? 0} tone="pending" items={(result?.verificationQuestions ?? []).slice(0, 5)} empty="运行后生成核验清单" />
-        <section className="ai-data-sources"><header><b>真实数据源</b><span>{new Set((result?.citations ?? []).map((citation) => citation.sourceType)).size}</span></header><div>{[...new Set((result?.citations ?? []).map((citation) => citation.sourceType))].slice(0, 6).map((source) => <i key={source}>{source}</i>)}{!(result?.citations?.length ?? 0) ? <i>待载入</i> : null}</div></section>
+        <section className="ai-data-sources"><header><b>可引用来源</b><span>{new Set((result?.citations ?? []).map((citation) => citation.sourceType)).size}</span></header><div>{[...new Set((result?.citations ?? []).map((citation) => citation.sourceType))].slice(0, 6).map((source) => <i key={source}>{source}</i>)}{!(result?.citations?.length ?? 0) ? <i>待载入</i> : null}</div></section>
         <section className="ai-evidence-quality"><header><b>执行与证据约束</b><Gauge /></header>{[
           ["有效引用", result?.citations?.length ?? 0, Math.min(100, (result?.citations?.length ?? 0) * 12)],
           ["角色覆盖", result?.stages.filter((stage) => (stage.citationIds?.length ?? 0) > 0).length ?? 0, (result?.stages.filter((stage) => (stage.citationIds?.length ?? 0) > 0).length ?? 0) * 20],

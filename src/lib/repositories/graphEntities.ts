@@ -6,6 +6,7 @@ import type {
   GraphRelationDirection,
   SourceType,
 } from "@/lib/domain/types";
+import { effectiveEvidenceSql, type EvidenceVerificationStatus } from "@/lib/research/evidenceTrust";
 
 export type GraphEntityRelationInput = {
   stockCode: string;
@@ -19,6 +20,7 @@ export type GraphEntityRelationInput = {
   direction?: GraphRelationDirection;
   strength?: number;
   observedAt?: string;
+  verificationStatus?: "unverified" | "verified";
   evidence: {
     sourceType: SourceType;
     title: string;
@@ -26,6 +28,8 @@ export type GraphEntityRelationInput = {
     url: string;
     excerpt: string;
     credibility: ConfidenceLevel;
+    verificationStatus?: EvidenceVerificationStatus;
+    verifiedAt?: string;
   };
 };
 
@@ -42,6 +46,8 @@ export type CompanyGraphEntityRelation = {
   direction: GraphRelationDirection;
   strength: number;
   observedAt: string;
+  verificationStatus: "unverified" | "verified";
+  verifiedAt: string;
   isWatchlist: boolean;
   evidenceCount: number;
   evidencePreviews: Array<{
@@ -52,6 +58,9 @@ export type CompanyGraphEntityRelation = {
     sourceDate: string;
     url: string;
     excerpt: string;
+    verificationStatus: EvidenceVerificationStatus;
+    verifiedAt: string;
+    isExpired: boolean;
   }>;
   shortName?: string;
   board?: string;
@@ -92,6 +101,26 @@ export function createCompanyGraphEntityRelation(db: Database.Database, input: G
           @stockCode, @entityId, @relationType, @confidence, @rationale, @direction, @strength, @observedAt, @isWatchlist
         )
         on conflict(stock_code, entity_id) do update set
+          verification_status = case
+            when company_graph_entity_relations.relation_type != excluded.relation_type
+              or company_graph_entity_relations.confidence != excluded.confidence
+              or company_graph_entity_relations.rationale != excluded.rationale
+              or (@directionProvided = 1 and company_graph_entity_relations.direction != excluded.direction)
+              or (@strengthProvided = 1 and company_graph_entity_relations.strength != excluded.strength)
+              or (@observedAtProvided = 1 and company_graph_entity_relations.observed_at != excluded.observed_at)
+            then 'unverified'
+            else company_graph_entity_relations.verification_status
+          end,
+          verified_at = case
+            when company_graph_entity_relations.relation_type != excluded.relation_type
+              or company_graph_entity_relations.confidence != excluded.confidence
+              or company_graph_entity_relations.rationale != excluded.rationale
+              or (@directionProvided = 1 and company_graph_entity_relations.direction != excluded.direction)
+              or (@strengthProvided = 1 and company_graph_entity_relations.strength != excluded.strength)
+              or (@observedAtProvided = 1 and company_graph_entity_relations.observed_at != excluded.observed_at)
+            then ''
+            else company_graph_entity_relations.verified_at
+          end,
           relation_type = excluded.relation_type,
           confidence = excluded.confidence,
           rationale = excluded.rationale,
@@ -105,10 +134,22 @@ export function createCompanyGraphEntityRelation(db: Database.Database, input: G
     const relation = db.prepare("select id from company_graph_entity_relations where stock_code = ? and entity_id = ?").get(input.stockCode, entity.id) as { id: number };
     db.prepare(
       `
-        insert into company_graph_entity_evidences (entity_relation_id, source_type, title, source_date, url, excerpt, credibility)
-        values (@entityRelationId, @sourceType, @title, @sourceDate, @url, @excerpt, @credibility)
+        insert into company_graph_entity_evidences (
+          entity_relation_id, source_type, title, source_date, url, excerpt, credibility,
+          verification_status, verified_at
+        )
+        values (
+          @entityRelationId, @sourceType, @title, @sourceDate, @url, @excerpt, @credibility,
+          @verificationStatus, @verifiedAt
+        )
       `,
-    ).run({ entityRelationId: relation.id, ...input.evidence, title: input.evidence.title || input.evidence.url || "手动补充证据" });
+    ).run({
+      entityRelationId: relation.id,
+      ...input.evidence,
+      title: input.evidence.title || input.evidence.url || "手动补充证据",
+      verificationStatus: input.evidence.verificationStatus ?? "unverified",
+      verifiedAt: input.evidence.verifiedAt?.trim() ?? "",
+    });
     return getCompanyGraphEntityRelation(db, relation.id)!;
   })();
 }
@@ -120,11 +161,12 @@ export function listCompanyGraphEntityRelations(db: Database.Database, stockCode
         r.id, r.stock_code as stockCode, r.entity_id as entityId, entity.entity_type as entityType, entity.name as entityName, entity.summary as entitySummary,
         r.relation_type as relationType, r.confidence, r.rationale, r.direction, r.strength,
         coalesce(nullif(r.observed_at, ''), r.updated_at) as observedAt,
+        r.verification_status as verificationStatus, r.verified_at as verifiedAt,
         r.is_watchlist as isWatchlist, r.updated_at as updatedAt,
         count(e.id) as evidenceCount
       from company_graph_entity_relations r
       join research_graph_entities entity on entity.id = r.entity_id and entity.is_active = 1
-      left join company_graph_entity_evidences e on e.entity_relation_id = r.id and e.is_expired = 0
+      left join company_graph_entity_evidences e on e.entity_relation_id = r.id and (${effectiveEvidenceSql("e")})
       where r.stock_code = ?
       group by r.id
       order by r.is_watchlist desc, r.updated_at desc, r.id desc
@@ -141,12 +183,13 @@ export function listIndustryGraphEntityRelations(db: Database.Database): Industr
         company.short_name as shortName, company.board, company.industry, company.intro, company.main_business as mainBusiness,
         r.relation_type as relationType, r.confidence, r.rationale, r.direction, r.strength,
         coalesce(nullif(r.observed_at, ''), r.updated_at) as observedAt,
+        r.verification_status as verificationStatus, r.verified_at as verifiedAt,
         r.is_watchlist as isWatchlist, r.updated_at as updatedAt,
         count(e.id) as evidenceCount
       from company_graph_entity_relations r
       join research_graph_entities entity on entity.id = r.entity_id and entity.is_active = 1
       join companies company on company.stock_code = r.stock_code
-      left join company_graph_entity_evidences e on e.entity_relation_id = r.id and e.is_expired = 0
+      left join company_graph_entity_evidences e on e.entity_relation_id = r.id and (${effectiveEvidenceSql("e")})
       group by r.id
       order by r.id
     `,
@@ -161,11 +204,12 @@ function getCompanyGraphEntityRelation(db: Database.Database, relationId: number
         r.id, r.stock_code as stockCode, r.entity_id as entityId, entity.entity_type as entityType, entity.name as entityName, entity.summary as entitySummary,
         r.relation_type as relationType, r.confidence, r.rationale, r.direction, r.strength,
         coalesce(nullif(r.observed_at, ''), r.updated_at) as observedAt,
+        r.verification_status as verificationStatus, r.verified_at as verifiedAt,
         r.is_watchlist as isWatchlist, r.updated_at as updatedAt,
         count(e.id) as evidenceCount
       from company_graph_entity_relations r
       join research_graph_entities entity on entity.id = r.entity_id
-      left join company_graph_entity_evidences e on e.entity_relation_id = r.id and e.is_expired = 0
+      left join company_graph_entity_evidences e on e.entity_relation_id = r.id and (${effectiveEvidenceSql("e")})
       where r.id = ?
       group by r.id
     `,
@@ -180,9 +224,11 @@ function hydrateEvidencePreviews(db: Database.Database, rows: Array<Omit<Company
   const evidenceRows = db.prepare(
     `
       select id, entity_relation_id as relationId, source_type as sourceType, title, credibility,
-        source_date as sourceDate, url, excerpt
+        source_date as sourceDate, url, excerpt, verification_status as verificationStatus,
+        verified_at as verifiedAt, is_expired as isExpired
       from company_graph_entity_evidences
-      where is_expired = 0 and entity_relation_id in (${placeholders})
+      where (${effectiveEvidenceSql("company_graph_entity_evidences")})
+        and entity_relation_id in (${placeholders})
       order by entity_relation_id, source_date desc, id desc
     `,
   ).all(...ids) as Array<{
@@ -194,6 +240,9 @@ function hydrateEvidencePreviews(db: Database.Database, rows: Array<Omit<Company
     sourceDate: string;
     url: string;
     excerpt: string;
+    verificationStatus: EvidenceVerificationStatus;
+    verifiedAt: string;
+    isExpired: number;
   }>;
   const evidenceByRelation = new Map<number, CompanyGraphEntityRelation["evidencePreviews"]>();
   for (const evidence of evidenceRows) {
@@ -207,6 +256,9 @@ function hydrateEvidencePreviews(db: Database.Database, rows: Array<Omit<Company
         sourceDate: evidence.sourceDate,
         url: evidence.url,
         excerpt: evidence.excerpt,
+        verificationStatus: evidence.verificationStatus,
+        verifiedAt: evidence.verifiedAt,
+        isExpired: Boolean(evidence.isExpired),
       });
     }
     evidenceByRelation.set(evidence.relationId, previews);

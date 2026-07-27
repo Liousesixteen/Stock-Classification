@@ -126,4 +126,37 @@ describe("source snapshot repositories", () => {
       }),
     ]);
   });
+
+  it("keeps the last successful cache usable when a later refresh fails", () => {
+    const db = setupDb();
+
+    upsertSourceSnapshot(db, {
+      stockCode: "300346",
+      provider: "eastmoney_push2",
+      providerLabel: "东方财富基础资料",
+      status: "success",
+      facts: { shortName: "南大光电", industry: "电子化学品" },
+      fetchedAt: "2026-07-25 10:00:00",
+      expiresAt: "2026-07-26 10:00:00",
+    });
+    upsertSourceSnapshot(db, {
+      stockCode: "300346",
+      provider: "eastmoney_push2",
+      providerLabel: "东方财富基础资料",
+      status: "failed",
+      error: "上游暂时不可用",
+      fetchedAt: "2026-07-25 11:00:00",
+      expiresAt: "2026-07-25 11:05:00",
+    });
+
+    expect(listSourceSnapshots(db, "300346")[0]).toMatchObject({
+      status: "failed",
+      error: "上游暂时不可用",
+    });
+    expect(getFreshSourceSnapshot(db, "300346", "eastmoney_push2", new Date("2026-07-25T12:00:00+08:00"))).toMatchObject({
+      status: "success",
+      facts: { shortName: "南大光电", industry: "电子化学品" },
+      fetchedAt: "2026-07-25 10:00:00",
+    });
+  });
 });

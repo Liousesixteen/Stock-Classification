@@ -30,6 +30,7 @@ import {
   Waypoints,
   X,
 } from "lucide-react";
+import * as React from "react";
 import { type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type { Company } from "@/lib/domain/types";
@@ -91,6 +92,7 @@ type CompanyDetailResponse = {
 };
 
 type CompanySourceSnapshot = NonNullable<CompanyDetailResponse["sourceSnapshots"]>[number];
+type CompanyDetailLoadStatus = "idle" | "loading" | "error" | "ready";
 
 type CompanyDetailsProps = {
   stockCode: string | null;
@@ -171,7 +173,9 @@ export function CompanyDetails({
   focusSectionId,
 }: CompanyDetailsProps) {
   const [data, setData] = useState<CompanyDetailResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<CompanyDetailLoadStatus>("idle");
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingResearchProfile, setIsEditingResearchProfile] = useState(false);
   const [draft, setDraft] = useState<CompanyDraft | null>(null);
@@ -199,7 +203,8 @@ export function CompanyDetails({
   useEffect(() => {
     if (!stockCode) {
       setData(null);
-      setIsLoading(false);
+      setLoadStatus("idle");
+      setLoadError("");
       setIsEditing(false);
       setIsEditingResearchProfile(false);
       setDraft(null);
@@ -210,6 +215,7 @@ export function CompanyDetails({
     }
 
     setData(null);
+    setLoadError("");
     setIsEditing(false);
     setIsEditingResearchProfile(false);
     setDraft(null);
@@ -223,21 +229,37 @@ export function CompanyDetails({
   useEffect(() => {
     if (!stockCode) return;
 
-    let isMounted = true;
-    setIsLoading(true);
-    fetch(`/api/companies/${stockCode}`)
-      .then((response) => response.json() as Promise<CompanyDetailResponse>)
-      .then((payload) => {
-        if (isMounted) setData(payload);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+    const controller = new AbortController();
+    setLoadStatus("loading");
+    setLoadError("");
+
+    const loadCompanyDetails = async () => {
+      try {
+        const response = await fetch(`/api/companies/${stockCode}`, { signal: controller.signal });
+        const payload = await response.json().catch(() => null) as unknown;
+        if (!response.ok) {
+          throw new Error(companyDetailResponseError(payload, response.status));
+        }
+        if (!isCompanyDetailResponse(payload)) {
+          throw new Error("公司详情数据格式无效，请重新加载。");
+        }
+        if (controller.signal.aborted) return;
+        setData(payload);
+        setLoadStatus("ready");
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setData(null);
+        setLoadError(error instanceof Error && error.message ? error.message : "公司详情服务暂时不可用，请稍后重试。");
+        setLoadStatus("error");
+      }
+    };
+
+    void loadCompanyDetails();
 
     return () => {
-      isMounted = false;
+      controller.abort();
     };
-  }, [refreshKey, stockCode]);
+  }, [loadAttempt, refreshKey, stockCode]);
 
   const startEditing = () => {
     if (!data) return;
@@ -412,12 +434,37 @@ export function CompanyDetails({
     );
   }
 
-  if (isLoading || !data) {
+  if (loadStatus === "error") {
     return (
       <div className="h-full">
         <div className="text-xs font-semibold uppercase text-muted">公司研究详情</div>
-        <div className="mt-4 flex items-center gap-2 text-sm text-muted">
-          <span className="h-2 w-2 rounded-full bg-cyan-500 shadow-[0_0_16px_rgba(6,182,212,0.75)]" />
+        <div className="mt-4 grid gap-3 rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
+          <div className="flex items-start gap-2">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div>
+              <strong className="block">公司详情加载失败</strong>
+              <p className="mt-1 text-xs">{loadError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="action-button inline-flex h-9 w-fit items-center gap-1 px-3 text-sm font-semibold"
+            onClick={() => setLoadAttempt((value) => value + 1)}
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            重新加载
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadStatus !== "ready" || !data) {
+    return (
+      <div className="h-full">
+        <div className="text-xs font-semibold uppercase text-muted">公司研究详情</div>
+        <div className="mt-4 flex items-center gap-2 text-sm text-muted" role="status" aria-live="polite">
+          <span className="h-2 w-2 rounded-full bg-cyan-500 shadow-[0_0_16px_rgba(6,182,212,0.75)]" aria-hidden="true" />
           加载公司详情中...
         </div>
       </div>
@@ -742,6 +789,18 @@ export function CompanyDetails({
   );
 }
 
+function isCompanyDetailResponse(payload: unknown): payload is CompanyDetailResponse {
+  return typeof payload === "object" && payload !== null && "company" in payload;
+}
+
+function companyDetailResponseError(payload: unknown, status: number) {
+  if (typeof payload === "object" && payload !== null && "error" in payload) {
+    const message = (payload as { error?: unknown }).error;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return `公司详情加载失败（HTTP ${status}），请稍后重试。`;
+}
+
 type CompanyDossierProps = {
   company: Company;
   detail: ReturnType<typeof buildCompanyResearchDetail>;
@@ -886,7 +945,7 @@ function CompanyDossier(props: CompanyDossierProps) {
         <section className="company-dossier-events"><h3>最新动态</h3>{dossierEvidenceFallback(evidenceRows).slice(0, 5).map((item) => <div key={item.id}><span>{item.sourceType || "资料"}</span><p>{item.title}</p><time>{item.sourceDate || "待同步"}</time></div>)}</section>
       </aside>
 
-      <main className="company-dossier-main">
+      <section className="company-dossier-main" aria-label="公司研究档案正文">
         {isEditing && draft ? <CompanyEditor draft={draft} error={formError} onChange={onCompanyDraftChange} onSubmit={onCompanySubmit} onClose={onToggleCompanyEdit} /> : null}
 
         <section id="company-section-0" data-testid="instant-company-brief" className="dossier-panel company-dossier-overview">
@@ -963,7 +1022,7 @@ function CompanyDossier(props: CompanyDossierProps) {
         <section className="dossier-panel company-research-note"><PanelHeading title="我的研究备注" action={<button type="button" onClick={onToggleNoteEdit}>{isEditingNote ? <X /> : <Pencil />}{isEditingNote ? "取消" : "编辑"}</button>} />
           {isEditingNote ? <form onSubmit={onNoteSubmit}><textarea value={noteDraft} onChange={(event) => onNoteDraftChange(event.target.value)} rows={4} placeholder="记录你的研究判断、疑点和跟踪计划" /><div>{noteError ? <span>{noteError}</span> : null}<button type="submit"><Check />保存备注</button></div></form> : <p>{detail.note.content || "暂无研究备注。可记录你的判断、待验证问题和跟踪计划。"}</p>}
         </section>
-      </main>
+      </section>
 
       <aside className="company-dossier-quality">
         <section className="dossier-panel company-quality-card">

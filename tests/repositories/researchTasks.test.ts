@@ -51,6 +51,7 @@ describe("research tasks repository", () => {
       sourceUrl: "https://example.com/revenue",
       confidence: "high",
     });
+    syncAutomaticResearchTasks(db);
     const active = listResearchTasks(db);
     expect(active.some((task) => task.id === failure?.id)).toBe(false);
     const persisted = listResearchTasks(db, { includeCompleted: true }).find((task) => task.id === failure?.id);
@@ -69,6 +70,8 @@ describe("research tasks repository", () => {
       set relation_type = '待验证', confidence = '低', verification_status = 'unverified'
       where id = ?
     `).run(relation.id);
+    db.prepare("update company_category_relations set is_watchlist = 1 where id = ?").run(relation.id);
+    syncAutomaticResearchTasks(db);
 
     const task = listResearchTasks(db).find((item) =>
       item.relationId === relation.id && item.taskType === "low_confidence",

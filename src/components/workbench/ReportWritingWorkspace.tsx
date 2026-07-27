@@ -162,7 +162,7 @@ export function ReportWritingWorkspace({
         </>}
       </aside>
 
-      <main className="report-studio-editor">
+      <section className="report-studio-editor" aria-label="报告编辑区">
         <div className="report-rich-toolbar" role="toolbar" aria-label="Markdown 格式工具">
           <button type="button" onClick={() => wrapSelection("**")} title="加粗"><b>B</b></button>
           <button type="button" onClick={() => wrapSelection("*")} title="斜体"><i>I</i></button>
@@ -181,7 +181,7 @@ export function ReportWritingWorkspace({
           </> : <ReportEmptyDraft company={company} focus={focus} onGenerate={onGenerate} writing={writing} />}
         </article>
         <footer className="report-editor-status"><span>{dirty ? <CircleAlert /> : <CheckCircle2 />}{dirty ? "修改尚未保存为新版本" : "正文与当前版本一致"}</span><span>{report?.model || "AA Research Engine"} · 引用约束写作</span></footer>
-      </main>
+      </section>
 
       <aside className="report-studio-quality">
         <section className="report-quality-sources">

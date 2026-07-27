@@ -5,6 +5,7 @@ import type {
   GraphRelationDirection,
   RelationType,
 } from "@/lib/domain/types";
+import type { EvidenceVerificationStatus } from "@/lib/research/evidenceTrust";
 
 export type IndustryGraphSignalFilter =
   | "all"
@@ -51,6 +52,9 @@ export type IndustryGraphEvidencePreview = {
   sourceDate: string;
   url?: string;
   excerpt?: string;
+  verificationStatus?: EvidenceVerificationStatus;
+  verifiedAt?: string;
+  isExpired?: boolean;
 };
 
 export type IndustryGraphEntityRelationRow = {
@@ -69,6 +73,7 @@ export type IndustryGraphEntityRelationRow = {
   direction?: GraphRelationDirection;
   strength?: number;
   observedAt?: string;
+  verificationStatus?: "unverified" | "verified";
   shortName?: string;
   board?: string;
   industry?: string;
@@ -123,6 +128,7 @@ export type IndustryGraphNode =
       credibility: ConfidenceLevel;
       url: string;
       excerpt: string;
+      verificationStatus: EvidenceVerificationStatus;
       layoutSeed: number;
     };
 
@@ -168,6 +174,7 @@ export type IndustryGraphEdge =
       direction?: GraphRelationDirection;
       strength?: number;
       observedAt?: string;
+      verificationStatus?: "unverified" | "verified";
     }
   | {
       id: string;

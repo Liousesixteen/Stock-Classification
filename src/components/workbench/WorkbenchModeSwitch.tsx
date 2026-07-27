@@ -21,7 +21,7 @@ export function WorkbenchModeSwitch({ value, onChange, onOpenQueue }: { value: W
           成果库
         </button>
       </div>
-      <button className="queue-launch" type="button" aria-pressed={value === "queue"} onClick={onOpenQueue}>
+      <button className="queue-launch" type="button" aria-label="任务中心" aria-pressed={value === "queue"} onClick={onOpenQueue}>
         <ClipboardList aria-hidden="true" />
         <span>任务中心</span>
       </button>

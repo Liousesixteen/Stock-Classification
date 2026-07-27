@@ -17,18 +17,18 @@ export function GlobalMarketTicker() {
   const stream = [...MARKETS, ...MARKETS];
 
   return (
-    <section className="global-market-ticker" aria-label="全球市场指数">
-      <div className="market-ticker-label"><Activity aria-hidden="true" /><span>市场行情</span><b>GLOBAL MARKETS</b></div>
+    <section className="global-market-ticker" aria-label="全球市场指数界面示例，非实时行情">
+      <div className="market-ticker-label"><Activity aria-hidden="true" /><span>行情示例</span><b>NON-LIVE DEMO</b></div>
       <div className="market-ticker-viewport">
         <div className="market-ticker-track">
           {stream.map((market, index) => (
-            <div className="market-ticker-item" key={`${market.name}-${index}`}>
+            <div className="market-ticker-item" key={`${market.name}-${index}`} aria-hidden={index >= MARKETS.length}>
               <span>{market.name}</span><b>{market.value}</b><em className={market.tone}>{market.change}</em>
             </div>
           ))}
         </div>
       </div>
-      <div className="market-ticker-status"><i />数据正常</div>
+      <div className="market-ticker-status is-demo"><i />演示行情 · 非实时</div>
     </section>
   );
 }

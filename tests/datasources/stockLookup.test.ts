@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStockProfileProviderPlan } from "@/lib/datasources/providerPlan";
+import { getStockProfileProviderPlan, STOCK_PROFILE_PROVIDER_IDS } from "@/lib/datasources/providerPlan";
 import {
   eastmoneySecId,
   inferBoard,
@@ -112,7 +112,9 @@ describe("stockLookup", () => {
       );
     };
 
-    await expect(lookupStockProfile("300346", fetcher)).resolves.toMatchObject({
+    await expect(lookupStockProfile("300346", fetcher, {
+      providerOrder: [...STOCK_PROFILE_PROVIDER_IDS],
+    })).resolves.toMatchObject({
       stockCode: "300346",
       shortName: "南大光电",
       fullName: "江苏南大光电材料股份有限公司",
@@ -196,6 +198,7 @@ describe("stockLookup", () => {
 
     const result = await lookupStockProfileWithTrace("300346", fetcher, {
       providerTimeoutMs: 500,
+      providerOrder: [...STOCK_PROFILE_PROVIDER_IDS],
     });
 
     expect(result.profile).toMatchObject({
@@ -245,11 +248,12 @@ describe("stockLookup", () => {
   });
 
   it("normalizes provider priority using the configured data-source plan", () => {
-    expect(
-      getStockProfileProviderPlan({
-        providerOrder: ["baidu_related_blocks", "unknown", "eastmoney_f10_company_survey", "baidu_related_blocks"],
-      }).map((provider) => provider.id),
-    ).toEqual(["eastmoney_push2", "baidu_related_blocks", "eastmoney_f10_company_survey"]);
+    expect(getStockProfileProviderPlan({
+      providerOrder: ["baidu_related_blocks", "eastmoney_f10_company_survey", "baidu_related_blocks"],
+    }).map((provider) => provider.id)).toEqual(["baidu_related_blocks", "eastmoney_f10_company_survey"]);
+    expect(() => getStockProfileProviderPlan({
+      providerOrder: ["baidu_related_blocks", "unknown"],
+    })).toThrow("未知股票数据 Provider");
   });
 
   it("resolves an exact Chinese stock name from a local stock index before lookup", async () => {
@@ -270,6 +274,7 @@ describe("stockLookup", () => {
 
     await expect(
       lookupStockProfile("百济神州", fetcher, {
+        providerOrder: ["eastmoney_push2"],
         stockIndexItems: [["688235.SH", "688235", "百济神州", "baijishenzhou", "bjsz", [], "CN", "stock", true, 100]],
       }),
     ).resolves.toMatchObject({

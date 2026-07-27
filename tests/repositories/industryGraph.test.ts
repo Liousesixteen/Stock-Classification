@@ -61,8 +61,8 @@ describe("listIndustryGraphRelations", () => {
 
     const insertEvidence = db.prepare(
       `
-        insert into evidences (relation_id, source_type, title, is_expired)
-        values (?, '公告', ?, ?)
+        insert into evidences (relation_id, source_type, title, url, is_expired)
+        values (?, '公告', ?, 'https://example.com/notice', ?)
       `,
     );
     insertEvidence.run(relation.id, "有效证据", 0);

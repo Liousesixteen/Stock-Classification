@@ -107,6 +107,9 @@ export function migrate(db: Database.Database) {
       duration_ms integer not null default 0,
       fetched_at text not null default current_timestamp,
       expires_at text not null default '',
+      last_success_facts_json text not null default '{}',
+      last_success_fetched_at text not null default '',
+      last_success_expires_at text not null default '',
       created_at text not null default current_timestamp,
       updated_at text not null default current_timestamp,
       primary key(stock_code, provider)
@@ -335,6 +338,17 @@ export function migrate(db: Database.Database) {
   ensureColumn(db, "company_category_relations", "verified_at", "text not null default ''");
   ensureColumn(db, "evidences", "verification_status", "text not null default 'unverified'");
   ensureColumn(db, "evidences", "verified_at", "text not null default ''");
+  ensureColumn(db, "company_source_snapshots", "last_success_facts_json", "text not null default '{}'");
+  ensureColumn(db, "company_source_snapshots", "last_success_fetched_at", "text not null default ''");
+  ensureColumn(db, "company_source_snapshots", "last_success_expires_at", "text not null default ''");
+  db.exec(`
+    update company_source_snapshots
+    set last_success_facts_json = facts_json,
+        last_success_fetched_at = fetched_at,
+        last_success_expires_at = expires_at
+    where status = 'success'
+      and last_success_fetched_at = '';
+  `);
   ensureColumn(db, "company_graph_entity_relations", "direction", "text not null default 'undirected'");
   ensureColumn(db, "company_graph_entity_relations", "strength", "integer not null default 50");
   ensureColumn(db, "company_graph_entity_relations", "observed_at", "text not null default ''");

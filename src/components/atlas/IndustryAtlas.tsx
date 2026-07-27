@@ -128,7 +128,7 @@ export function IndustryAtlas({ selectedCategoryId, selectedStockCode, refreshKe
       style={panels.style}
     >
       <div className="atlas-topbar"><div><span className="atlas-mark" aria-hidden="true"><i /><b /><em /></span><strong>产业链星图</strong><small>A-SHARE INDUSTRY INTELLIGENCE GRAPH</small></div><p><Activity aria-hidden="true" />{statusText}</p><button type="button" onClick={() => { setActivePath(null); setSelectedEntityId(null); setSelectedEvidenceNodeId(null); onClearSelection(); setSceneKey((value) => value + 1); }} title="重置星图"><RotateCcw aria-hidden="true" /></button></div>
-      <ResizablePanelControls layout={panels.layout} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
+      <ResizablePanelControls layout={panels.layout} bounds={panels.bounds} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
       {graphState.status === "loading" ? <WorkspaceState state="loading" title="正在构建产业链星图" description="读取分类、公司、关系与证据节点" /> : null}
       {graphState.status === "error" ? <WorkspaceState state="error" title="产业链图谱暂时不可用" description={graphState.message} onAction={() => setGraphReloadKey((value) => value + 1)} /> : null}
       {graph ? (

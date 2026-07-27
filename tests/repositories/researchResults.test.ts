@@ -78,10 +78,33 @@ describe("research results repository", () => {
       markdown: "# 半导体赛道研究报告",
       model: "test-model",
       status: "ready",
-      citations: [{ id: "evidence:1", title: "行业资料", sourceType: "研报", sourceDate: "", url: "", excerpt: "资料", credibility: "中" }],
+      citations: [{ id: "evidence:1", title: "行业资料", sourceType: "研报", sourceDate: "", url: "https://example.com/industry-report", excerpt: "资料", credibility: "中" }],
       quality: { score: 86, sectionCoverage: 100, citationCoverage: 80, evidenceQuality: 72, riskDisclosure: 100, unsupportedClaimCount: 0, issues: [] },
       charts: [],
     });
+    const snapshotRelations = db.prepare(`
+      select relation.id
+      from company_category_relations relation
+      where relation.category_id = (
+        select category_id
+        from company_category_relations
+        group by category_id
+        having count(distinct stock_code) >= 2
+        order by count(distinct stock_code) desc
+        limit 1
+      )
+      order by relation.id
+      limit 2
+    `).all() as Array<{ id: number }>;
+    const addEvidence = db.prepare(`
+      insert into evidences (relation_id, source_type, title, url, credibility)
+      values (?, '公告', ?, ?, '高')
+    `);
+    snapshotRelations.forEach((relation, index) => addEvidence.run(
+      relation.id,
+      `快照来源 ${index + 1}`,
+      `https://example.com/snapshot/${index + 1}`,
+    ));
 
     const library = listResearchResults(db);
 
@@ -90,6 +113,9 @@ describe("research results repository", () => {
     expect(library.artifacts.some((artifact) => artifact.kind === "snapshot")).toBe(true);
     expect(library.artifacts).toContainEqual(expect.objectContaining({ id: "document-1", kind: "report", completeness: 86, categoryName: "半导体" }));
     expect(library.artifacts).toContainEqual(expect.objectContaining({ id: "universal-run-1", kind: "ai", stage: "needs_work", categoryName: "开放研究" }));
+    expect(library.artifacts).toContainEqual(expect.objectContaining({ id: "report-1", stage: "needs_work", completeness: expect.any(Number) }));
+    expect(library.artifacts.find((artifact) => artifact.id === "report-1")?.completeness).toBeLessThanOrEqual(20);
+    expect(library.artifacts.find((artifact) => artifact.id === "run-1")?.completeness).toBe(15);
     expect(library.artifacts.every((artifact) => ["ready", "draft", "needs_work"].includes(artifact.stage))).toBe(true);
     expect(library.stats.total).toBe(library.artifacts.length);
     expect(JSON.stringify(library)).not.toContain("published");

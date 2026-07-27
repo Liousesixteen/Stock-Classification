@@ -367,10 +367,11 @@ export function mountIndustryGraphScene(
     if (edge.kind === "evidenceLink" && (interaction.signalFilter === "upstream" || interaction.signalFilter === "downstream")) return false;
     if (interaction.signalFilter === "upstream") return edge.direction === "inbound" || edge.direction === "bidirectional";
     if (interaction.signalFilter === "downstream") return edge.direction === "outbound" || edge.direction === "bidirectional";
-    if (interaction.signalFilter === "verified") return (edge.kind === "relation" && edge.verificationStatus === "verified") || (edge.evidenceCount > 0 && edge.confidence !== "低" && (edge.kind !== "relation" || edge.relationType !== "待验证"));
-    if (interaction.signalFilter === "review") return (edge.kind !== "relation" || edge.verificationStatus !== "verified") && (edge.confidence === "低" || (edge.kind === "relation" && edge.relationType === "待验证"));
+    if (edge.kind === "evidenceLink") return false;
+    if (interaction.signalFilter === "verified") return edge.verificationStatus === "verified";
+    if (interaction.signalFilter === "review") return edge.verificationStatus !== "verified";
     if (interaction.signalFilter === "missingEvidence") return edge.evidenceCount === 0;
-    return edge.kind !== "evidenceLink" && Boolean(edge.isWatchlist);
+    return Boolean(edge.isWatchlist);
   };
   const edgeByEndpoints = new Map(graph.edges.map((edge) => [`${edge.source}->${edge.target}`, edge]));
   const isNodeVisibleForSignal = (node: IndustryGraphNode | undefined) => {

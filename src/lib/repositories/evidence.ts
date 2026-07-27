@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { ConfidenceLevel, Evidence, SourceType } from "@/lib/domain/types";
+import type { EvidenceVerificationStatus } from "@/lib/research/evidenceTrust";
 import { setPrimaryEvidenceForRelation } from "./relations";
 
 export type EvidenceInput = {
@@ -11,6 +12,8 @@ export type EvidenceInput = {
   excerpt: string;
   credibility: ConfidenceLevel;
   isExpired: boolean;
+  verificationStatus?: EvidenceVerificationStatus;
+  verifiedAt?: string;
 };
 
 type EvidenceIdRow = {
@@ -33,7 +36,9 @@ export function createEvidence(db: Database.Database, evidence: EvidenceInput) {
           url,
           excerpt,
           credibility,
-          is_expired
+          is_expired,
+          verification_status,
+          verified_at
         )
         values (
           @relationId,
@@ -43,11 +48,18 @@ export function createEvidence(db: Database.Database, evidence: EvidenceInput) {
           @url,
           @excerpt,
           @credibility,
-          @isExpired
+          @isExpired,
+          @verificationStatus,
+          @verifiedAt
         )
       `,
     )
-    .run({ ...evidence, isExpired: evidence.isExpired ? 1 : 0 });
+    .run({
+      ...evidence,
+      isExpired: evidence.isExpired ? 1 : 0,
+      verificationStatus: evidence.verificationStatus ?? "unverified",
+      verifiedAt: evidence.verifiedAt?.trim() ?? "",
+    });
 
   return Number(result.lastInsertRowid);
 }
@@ -85,7 +97,9 @@ export function listEvidenceForRelation(db: Database.Database, relationId: numbe
           url,
           excerpt,
           credibility,
-          is_expired as isExpired
+          is_expired as isExpired,
+          verification_status as verificationStatus,
+          verified_at as verifiedAt
         from evidences
         where relation_id = ?
         order by source_date desc, id desc

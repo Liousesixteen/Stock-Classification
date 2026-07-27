@@ -108,16 +108,18 @@ export function useResizablePanelLayout(
     "--workspace-right-panel": layout.rightCollapsed ? "0px" : `${layout.rightWidth}px`,
   }) as CSSProperties, [layout]);
 
-  return { layout, style, resize, resizeByKeyboard, toggle };
+  return { layout, bounds: { left, right }, style, resize, resizeByKeyboard, toggle };
 }
 
 export function ResizablePanelControls({
   layout,
+  bounds,
   onResize,
   onResizeByKeyboard,
   onToggle,
 }: {
   layout: PanelLayout;
+  bounds: { left: PanelDefinition; right: PanelDefinition };
   onResize: (side: PanelSide, event: ReactPointerEvent<HTMLElement>) => void;
   onResizeByKeyboard: (side: PanelSide, delta: number) => void;
   onToggle: (side: PanelSide) => void;
@@ -150,11 +152,14 @@ export function ResizablePanelControls({
           role="separator"
           aria-label="调整左侧栏宽度"
           aria-orientation="vertical"
+          aria-valuemin={bounds.left.minWidth}
+          aria-valuemax={bounds.left.maxWidth}
+          aria-valuenow={layout.leftWidth}
           tabIndex={0}
           onPointerDown={(event) => onResize("left", event)}
           onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") onResizeByKeyboard("left", -12);
-            if (event.key === "ArrowRight") onResizeByKeyboard("left", 12);
+            if (event.key === "ArrowLeft") { event.preventDefault(); onResizeByKeyboard("left", -12); }
+            if (event.key === "ArrowRight") { event.preventDefault(); onResizeByKeyboard("left", 12); }
           }}
         ><GripVertical aria-hidden="true" /></div>
       ) : null}
@@ -164,11 +169,14 @@ export function ResizablePanelControls({
           role="separator"
           aria-label="调整右侧栏宽度"
           aria-orientation="vertical"
+          aria-valuemin={bounds.right.minWidth}
+          aria-valuemax={bounds.right.maxWidth}
+          aria-valuenow={layout.rightWidth}
           tabIndex={0}
           onPointerDown={(event) => onResize("right", event)}
           onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") onResizeByKeyboard("right", 12);
-            if (event.key === "ArrowRight") onResizeByKeyboard("right", -12);
+            if (event.key === "ArrowLeft") { event.preventDefault(); onResizeByKeyboard("right", 12); }
+            if (event.key === "ArrowRight") { event.preventDefault(); onResizeByKeyboard("right", -12); }
           }}
         ><GripVertical aria-hidden="true" /></div>
       ) : null}

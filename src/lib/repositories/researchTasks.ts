@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { effectiveEvidenceSql } from "@/lib/research/evidenceTrust";
 
 export type ResearchTaskType =
   | "missing_evidence"
@@ -109,6 +110,19 @@ export function syncAutomaticResearchTasks(db: Database.Database) {
           else research_tasks.completed_at
         end,
         updated_at = current_timestamp
+      where research_tasks.status = 'completed'
+         or research_tasks.task_type != excluded.task_type
+         or research_tasks.priority != excluded.priority
+         or research_tasks.title != excluded.title
+         or research_tasks.description != excluded.description
+         or research_tasks.target_type != excluded.target_type
+         or coalesce(research_tasks.stock_code, '') != coalesce(excluded.stock_code, '')
+         or coalesce(research_tasks.category_id, 0) != coalesce(excluded.category_id, 0)
+         or coalesce(research_tasks.relation_id, 0) != coalesce(excluded.relation_id, 0)
+         or coalesce(research_tasks.evidence_id, 0) != coalesce(excluded.evidence_id, 0)
+         or coalesce(research_tasks.report_id, 0) != coalesce(excluded.report_id, 0)
+         or research_tasks.field_key != excluded.field_key
+         or research_tasks.source_ref != excluded.source_ref
     `);
     for (const task of detected) {
       upsert.run({
@@ -143,7 +157,6 @@ export function syncAutomaticResearchTasks(db: Database.Database) {
 }
 
 export function listResearchTasks(db: Database.Database, options: { includeCompleted?: boolean } = {}) {
-  syncAutomaticResearchTasks(db);
   const where = options.includeCompleted ? "" : "where task.status in ('open', 'in_progress')";
   const rows = db.prepare(`
     select
@@ -166,7 +179,8 @@ export function listResearchTasks(db: Database.Database, options: { includeCompl
       task.evidence_id as evidenceId,
       coalesce((
         select count(*) from evidences evidence
-        where evidence.relation_id = task.relation_id and evidence.is_expired = 0
+        where evidence.relation_id = task.relation_id
+          and (${effectiveEvidenceSql("evidence")})
       ), 0) as evidenceCount,
       task.report_id as reportId,
       task.field_key as fieldKey,
@@ -278,12 +292,13 @@ function detectRelationTasks(db: Database.Database): AutomaticTaskInput[] {
       relation.verification_status as verificationStatus,
       company.short_name as shortName,
       category.name as categoryName,
-      sum(case when evidence.id is not null and evidence.is_expired = 0 then 1 else 0 end) as activeEvidenceCount,
+      sum(case when evidence.id is not null and (${effectiveEvidenceSql("evidence")}) then 1 else 0 end) as activeEvidenceCount,
       sum(case when evidence.id is not null and evidence.is_expired = 1 then 1 else 0 end) as staleEvidenceCount
     from company_category_relations relation
     join companies company on company.stock_code = relation.stock_code
     join categories category on category.id = relation.category_id and category.is_active = 1
     left join evidences evidence on evidence.relation_id = relation.id
+    where ${activeRelationSql("relation")}
     group by relation.id
   `).all() as Array<{
     relationId: number;
@@ -351,6 +366,7 @@ function detectProfileTasks(db: Database.Database): AutomaticTaskInput[] {
     join company_category_relations relation on relation.stock_code = company.stock_code
     left join company_research_profiles profile on profile.stock_code = company.stock_code
     where profile.stock_code is null
+      and ${activeRelationSql("relation")}
     group by company.stock_code
   `).all() as Array<{ stockCode: string; shortName: string; categoryId: number | null; relationId: number }>;
   return rows.map((row) => ({
@@ -364,6 +380,24 @@ function detectProfileTasks(db: Database.Database): AutomaticTaskInput[] {
     categoryId: row.categoryId,
     relationId: row.relationId,
   }));
+}
+
+function activeRelationSql(alias: string) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(alias)) throw new Error("关系 SQL 别名无效");
+  return `(
+    ${alias}.is_watchlist = 1
+    or exists (select 1 from evidences active_evidence where active_evidence.relation_id = ${alias}.id)
+    or exists (select 1 from company_field_facts active_fact where active_fact.stock_code = ${alias}.stock_code)
+    or exists (select 1 from sync_tasks active_sync where active_sync.stock_code = ${alias}.stock_code)
+    or exists (select 1 from ai_research_runs active_ai where active_ai.stock_code = ${alias}.stock_code)
+    or exists (select 1 from ai_research_reports active_ai_report where active_ai_report.stock_code = ${alias}.stock_code)
+    or exists (select 1 from research_documents active_report where active_report.stock_code = ${alias}.stock_code)
+    or exists (
+      select 1 from research_notes active_note
+      where (active_note.target_type = 'company' and active_note.target_id = ${alias}.stock_code)
+         or (active_note.target_type = 'relation' and active_note.target_id = cast(${alias}.id as text))
+    )
+  )`;
 }
 
 function detectFieldTasks(db: Database.Database): AutomaticTaskInput[] {

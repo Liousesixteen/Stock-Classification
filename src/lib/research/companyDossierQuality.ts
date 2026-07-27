@@ -2,6 +2,7 @@ import type { Company, Evidence } from "@/lib/domain/types";
 import type { CompanyFieldFact } from "@/lib/repositories/companyFieldFacts";
 import type { CompanyResearchProfile } from "@/lib/repositories/researchProfiles";
 import type { SourceSnapshot } from "@/lib/repositories/sourceSnapshots";
+import { isEffectiveEvidence } from "./evidenceTrust";
 
 export type DossierQualityStatus = "complete" | "partial" | "missing";
 export type DossierReliabilityLabel = "可靠" | "基本可靠" | "待核验" | "资料不足";
@@ -227,16 +228,16 @@ function assessFactField(
 
 function assessRelationField(relation: DossierRelation | undefined, evidence: Evidence[], now: Date): FieldAssessment {
   const available = Boolean(relation && isMeaningfulDossierValue(relation.categoryName) && isMeaningfulDossierValue(relation.rationale));
-  const validEvidence = evidence.filter((item) => !item.isExpired && isMeaningfulDossierValue(item.title));
+  const validEvidence = evidence.filter((item) => isEffectiveEvidence(item) && isMeaningfulDossierValue(item.title));
   const freshestEvidenceDate = validEvidence.map((item) => item.sourceDate).sort().at(-1);
   const freshness = getFreshness(freshestEvidenceDate, 365, now);
   const baseEvidenceScore = !available
     ? 0
     : validEvidence.length > 0
       ? Math.min(100, 65 + (validEvidence.some((item) => item.url) ? 15 : 0) + (validEvidence.some((item) => item.credibility === "高") ? 20 : 0))
-      : 20;
+      : 0;
   const evidenceScore = available && relation?.verificationStatus === "verified"
-    ? Math.min(100, baseEvidenceScore + 10)
+    ? Math.max(60, Math.min(100, baseEvidenceScore + 10))
     : baseEvidenceScore;
   return {
     fieldKey: "chainPosition",
@@ -260,7 +261,6 @@ function assessProfileField(
   now: Date,
 ): FieldAssessment {
   const available = isMeaningfulDossierValue(value);
-  const hasSource = isMeaningfulDossierValue(profile?.sourceSummary);
   const freshness = getFreshness(profile?.updatedAt, 180, now);
   return {
     fieldKey,
@@ -268,7 +268,7 @@ function assessProfileField(
     dimension,
     weight,
     available,
-    evidenceScore: available ? (hasSource ? 55 : 20) : 0,
+    evidenceScore: 0,
     freshnessScore: available ? freshness?.score ?? null : null,
     stale: available ? freshness?.stale ?? false : false,
   };
@@ -361,14 +361,25 @@ function buildIssues(
 }
 
 function getFactEvidenceScore(fact: CompanyFieldFact | undefined) {
-  if (!fact) return 20;
+  if (!fact) return 0;
   if (fact.verificationStatus === "rejected") return 0;
-  if (fact.verificationStatus === "conflicted") return 15;
-  let score = fact.sourceUrl ? 65 : 40;
+  if (fact.verificationStatus === "conflicted") return 0;
+  const traceable = isTraceableHttpUrl(fact.sourceUrl);
+  if (!traceable && fact.verificationStatus !== "verified") return 0;
+  let score = traceable ? 65 : 60;
   if (fact.confidence === "high") score += 15;
   if (fact.confidence === "medium") score += 8;
   if (fact.verificationStatus === "verified") score += 20;
   return Math.min(100, score);
+}
+
+function isTraceableHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function getFreshness(value: string | undefined, freshnessDays: number, now: Date) {

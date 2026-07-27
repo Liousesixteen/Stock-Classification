@@ -163,7 +163,7 @@ export function ResearchResultsLibrary({
     </header>
 
     <div className="results-layout">
-      <ResizablePanelControls layout={panels.layout} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
+      <ResizablePanelControls layout={panels.layout} bounds={panels.bounds} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
       <aside className="results-filter-rail">
         <label className="results-search"><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、摘要、公司、标签" /></label>
         <div className="results-filter-title"><span><Filter aria-hidden="true" />筛选条件</span><button type="button" onClick={() => { setFilter("all"); setCategory("all"); setQuery(""); }}>清空</button></div>
@@ -183,7 +183,7 @@ export function ResearchResultsLibrary({
         </FilterGroup>
       </aside>
 
-      <main className="results-main">
+      <section className="results-main" aria-label="研究成果列表">
         <div className="results-toolbar">
           <nav aria-label="成果类型快速筛选">
             <button className={filter === "all" ? "is-active" : ""} type="button" onClick={() => setFilter("all")}>全部</button>
@@ -204,7 +204,7 @@ export function ResearchResultsLibrary({
           {artifacts.map((artifact) => <ArtifactCard key={artifact.id} artifact={artifact} view={view} onPreview={() => setPreview(artifact)} onExport={() => exportArtifact(artifact)} onContinue={() => artifact.stockCode ? onOpenCompany(artifact.stockCode, artifact.categoryId) : onOpenAtlas(artifact.categoryId)} />)}
         </div>
         {artifacts.length ? <footer className="results-pagination"><button type="button" disabled><ChevronLeft aria-hidden="true" /></button><b>1</b><span>共 {artifacts.length} 项</span><em>每页 12 条</em></footer> : null}
-      </main>
+      </section>
 
       <aside className="results-insights">
         <section className="results-stat-card">

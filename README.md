@@ -12,7 +12,9 @@ npm install
 npm run dev -- --port 3001
 ```
 
-打开 [http://localhost:3001](http://localhost:3001)。首次启动会创建 `data/stock-classification.sqlite` 并写入样板分类与代表性标的。
+打开 [http://localhost:3001](http://localhost:3001)。首次启动会创建空的 `data/stock-classification.sqlite`，不会自动写入演示公司或关系。
+
+如需本地体验内置的半导体、创新药、机器人、商业航天和证券样板，可在 `.env.local` 设置 `STOCK_BOOTSTRAP_MODE=sample` 后启动。样板导入只补充数据库中不存在的记录；重复启动不会覆盖已有分类、公司、关系或它们的更新时间。生产和真实研究环境应保持默认的 `STOCK_BOOTSTRAP_MODE=empty`。
 
 ## 每日研究流程
 
@@ -64,7 +66,7 @@ npm run validate:providers
 
 ## 部署与运维
 
-- 当前发布候选版本说明见 [`docs/releases/0.1.0-rc.1.md`](docs/releases/0.1.0-rc.1.md)。
+- 当前发布候选版本说明见 [`docs/releases/0.1.0-rc.2.md`](docs/releases/0.1.0-rc.2.md)。
 - 生产部署、访问控制、健康检查和发布清单见 [`docs/operations/DEPLOYMENT.md`](docs/operations/DEPLOYMENT.md)。
 - SQLite 备份、验证和回滚恢复见 [`docs/operations/BACKUP_AND_RECOVERY.md`](docs/operations/BACKUP_AND_RECOVERY.md)。
 - 数据源商用授权与展示边界见 [`docs/operations/DATA_SOURCE_COMPLIANCE.md`](docs/operations/DATA_SOURCE_COMPLIANCE.md)。

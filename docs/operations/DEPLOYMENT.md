@@ -6,7 +6,8 @@
 2. 将新 Key 只写入服务器密钥管理或未纳入 Git 的 `.env.production`。
 3. 生成强随机的 `STOCK_APP_BASIC_AUTH_PASSWORD` 和 `STOCK_OPERATIONS_TOKEN`。
 4. 在正式域名和 HTTPS 反向代理后设置 `STOCK_FORCE_HTTPS=true`。
-5. 执行 `npm run security:check`，确认 Git 跟踪文件没有疑似密钥。
+5. 保持 `STOCK_BOOTSTRAP_MODE=empty`；`sample` 只用于显式创建本地演示数据，不得用于生产初始化。
+6. 执行 `npm run security:check`，确认 Git 跟踪文件没有疑似密钥。
 
 如果 `STOCK_APP_BASIC_AUTH_USER` 与密码同时为空，系统保持本地开发模式；生产环境必须同时配置。只配置其中一项时，服务会返回 503，避免误以为已经受保护。
 
@@ -33,7 +34,7 @@ npm run build
 HOSTNAME=127.0.0.1 PORT=3001 npm run start
 ```
 
-项目使用 Next.js standalone 产物；`postbuild` 会自动把静态资源和可选的 `public/` 目录装配到可运行目录。建议以专用非特权系统用户运行，并将 `data/` 与 `backups/` 置于只有该用户可读写的持久磁盘。
+项目使用 Next.js standalone 产物；`postbuild` 会自动把静态资源和可选的 `public/` 目录装配到可运行目录，并拒绝任何夹带 `.sqlite`、`.db`、WAL/SHM 边车或 `backups/` 内容的发布包。该检查只读取发布产物，不会删除或修改用户运行库。建议以专用非特权系统用户运行，并将运行时 `data/` 与 `backups/` 放在构建目录之外、置于只有该用户可读写的持久磁盘。
 
 ## 健康、指标与审计
 
@@ -52,6 +53,8 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+npm run test:release-artifacts
+npm run release:check
 npm run test:e2e
 npm run security:check
 NODE_ENV=production npm run ops:check

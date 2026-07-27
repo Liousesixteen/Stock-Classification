@@ -19,7 +19,9 @@ export function getDatabase(dbPath = process.env.STOCK_CLASSIFICATION_DB_PATH ??
     db.pragma("busy_timeout = 5000");
     db.pragma("foreign_keys = ON");
     migrate(db);
-    seedSemiconductorData(db);
+    if (getBootstrapMode() === "sample") {
+      seedSemiconductorData(db);
+    }
     enforcePrivatePermissions(resolvedPath);
   } catch (error) {
     db.close();
@@ -27,6 +29,10 @@ export function getDatabase(dbPath = process.env.STOCK_CLASSIFICATION_DB_PATH ??
   }
   appDbs.set(resolvedPath, db);
   return db;
+}
+
+function getBootstrapMode(): "empty" | "sample" {
+  return process.env.STOCK_BOOTSTRAP_MODE?.trim().toLowerCase() === "sample" ? "sample" : "empty";
 }
 
 function enforcePrivatePermissions(dbPath: string) {

@@ -3,6 +3,7 @@
 import { ExternalLink, FileCheck2, X } from "lucide-react";
 import type { IndustryGraphNode } from "@/lib/industry-graph/types";
 import { safeExternalUrl } from "@/lib/security/urls";
+import { evidenceTrustLabel } from "@/lib/research/evidenceTrust";
 
 type EvidenceNode = Extract<IndustryGraphNode, { kind: "evidence" }>;
 
@@ -20,7 +21,7 @@ export function AtlasEvidenceSnapshot({ evidence, onClose }: { evidence: Evidenc
           <button type="button" aria-label="关闭证据快照" onClick={onClose}><X aria-hidden="true" /></button>
         </div>
       </div>
-      <p className="atlas-meta">{evidence.sourceType} · {evidence.sourceDate || "时间待补"} · {evidence.credibility}可信度</p>
+      <p className="atlas-meta">{evidence.sourceType} · {evidence.sourceDate || "时间待补"} · {evidence.credibility}可信度 · {evidenceTrustLabel(evidence.verificationStatus === "verified" ? "verified" : sourceUrl ? "source_backed" : "unverified")}</p>
       <section>
         <span>证据摘录</span>
         <p>{evidence.excerpt || "尚未保存原文摘录，请通过来源链接核验。"}</p>

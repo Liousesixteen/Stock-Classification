@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { listResearchDocuments } from "@/lib/repositories/researchDocuments";
+import { effectiveEvidenceSql } from "@/lib/research/evidenceTrust";
 
 export type ResearchArtifactKind = "report" | "ai" | "snapshot" | "comparison";
 export type ResearchArtifactStage = "ready" | "draft" | "needs_work";
@@ -167,10 +168,13 @@ export function setResearchArtifactState(
 }
 
 function listResearchDocumentArtifacts(db: Database.Database): ResearchArtifact[] {
-  return listResearchDocuments(db).map((report) => ({
+  return listResearchDocuments(db).map((report) => {
+    const effectiveCitations = report.citations.filter((citation) => isTraceableCitation(citation.url));
+    const hasCitations = effectiveCitations.length > 0;
+    return {
     id: `document-${report.id}`,
     kind: "report",
-    stage: report.status === "ready" ? "ready" : report.status === "needs_work" ? "needs_work" : "draft",
+    stage: report.status === "ready" && hasCitations ? "ready" : report.status === "draft" ? "draft" : "needs_work",
     title: report.title,
     summary: report.executiveSummary || "报告摘要待完善。",
     content: report.markdown,
@@ -187,10 +191,11 @@ function listResearchDocumentArtifacts(db: Database.Database): ResearchArtifact[
     tags: [reportTypeLabel(report.reportType), `V${report.currentVersion}`, report.status === "ready" ? "质检通过" : "待完善"],
     model: report.model || "AI Research",
     version: `V${report.currentVersion}`,
-    evidenceCount: report.citations.length,
-    completeness: report.quality.score,
+    evidenceCount: effectiveCitations.length,
+    completeness: hasCitations ? report.quality.score : Math.min(20, report.quality.score),
     updatedAt: report.updatedAt,
-  }));
+    };
+  });
 }
 
 function listUniversalResearchRuns(db: Database.Database): ResearchArtifact[] {
@@ -226,7 +231,7 @@ function listUniversalResearchRuns(db: Database.Database): ResearchArtifact[] {
       model: row.model || "AI Research",
       version: `U${row.id}`,
       evidenceCount: citations.length,
-      completeness: clamp(45 + citations.length * 8, 45, 98),
+      completeness: citations.length ? clamp(20 + citations.length * 10, 20, 98) : 15,
       updatedAt: row.updatedAt,
     };
   });
@@ -240,7 +245,8 @@ function listReports(db: Database.Database): ResearchArtifact[] {
             company.short_name as shortName, category.name as categoryName,
             (select count(*) from evidences evidence
              join company_category_relations relation on relation.id = evidence.relation_id
-             where relation.stock_code = report.stock_code) as evidenceCount
+             where relation.stock_code = report.stock_code
+               and (${effectiveEvidenceSql("evidence")})) as evidenceCount
      from ai_research_reports report
      join companies company on company.stock_code = report.stock_code
      left join categories category on category.id = report.category_id
@@ -250,7 +256,7 @@ function listReports(db: Database.Database): ResearchArtifact[] {
   return rows.map((row) => ({
     id: `report-${row.id}`,
     kind: "report",
-    stage: row.executiveSummary.length > 40 ? "ready" : "needs_work",
+    stage: row.executiveSummary.length > 40 && row.evidenceCount > 0 ? "ready" : "needs_work",
     title: row.title,
     summary: row.executiveSummary || "报告摘要待完善。",
     content: row.content,
@@ -262,7 +268,9 @@ function listReports(db: Database.Database): ResearchArtifact[] {
     model: row.model || "AI Research",
     version: `V${Math.max(1, row.id)}.0`,
     evidenceCount: row.evidenceCount,
-    completeness: clamp(62 + row.evidenceCount * 5, 62, 100),
+    completeness: row.evidenceCount > 0
+      ? clamp(45 + row.evidenceCount * 8, 45, 100)
+      : Math.min(20, Math.round(row.executiveSummary.length / 5)),
     updatedAt: row.updatedAt,
   }));
 }
@@ -275,7 +283,8 @@ function listResearchRuns(db: Database.Database): ResearchArtifact[] {
             category.name as categoryName,
             (select count(*) from evidences evidence
              join company_category_relations relation on relation.id = evidence.relation_id
-             where relation.stock_code = run.stock_code) as evidenceCount
+             where relation.stock_code = run.stock_code
+               and (${effectiveEvidenceSql("evidence")})) as evidenceCount
      from ai_research_runs run
      join companies company on company.stock_code = run.stock_code
      left join categories category on category.id = run.category_id
@@ -304,7 +313,7 @@ function listResearchRuns(db: Database.Database): ResearchArtifact[] {
       model: row.model || "AI Research",
       version: `R${row.id}`,
       evidenceCount: citations.length,
-      completeness: clamp(58 + citations.length * 7, 58, 98),
+      completeness: citations.length ? clamp(20 + citations.length * 10, 20, 98) : 15,
       updatedAt: row.updatedAt,
     };
   });
@@ -326,7 +335,8 @@ function listProfileArtifacts(db: Database.Database): ResearchArtifact[] {
                order by case relation.relation_type when '主营业务' then 0 when '重要相关' then 1 else 2 end, relation.id limit 1)) as categoryName,
             (select count(*) from evidences evidence
              join company_category_relations relation on relation.id = evidence.relation_id
-             where relation.stock_code = profile.stock_code) as evidenceCount
+             where relation.stock_code = profile.stock_code
+               and (${effectiveEvidenceSql("evidence")})) as evidenceCount
      from company_research_profiles profile
      join companies company on company.stock_code = profile.stock_code
      order by profile.updated_at desc`,
@@ -339,7 +349,11 @@ function listProfileArtifacts(db: Database.Database): ResearchArtifact[] {
     const catalysts = stringListFromStructuredJson(row.catalysts);
     const risks = stringListFromStructuredJson(row.risks);
     const filledSections = [row.summary, businessLines.join(""), chainPosition.join(""), advantages.join(""), catalysts.join(""), risks.join("")].filter(Boolean).length;
-    const completeness = clamp(Math.round(filledSections / 6 * 76) + Math.min(24, row.evidenceCount * 6), 35, 100);
+    const completeness = clamp(
+      Math.round(filledSections / 6 * 60) + Math.min(40, row.evidenceCount * 10),
+      0,
+      100,
+    );
     return {
       id: `profile-${row.stockCode}`,
       kind: "ai" as const,
@@ -371,8 +385,17 @@ function listCategoryArtifacts(db: Database.Database): ResearchArtifact[] {
      from categories category
      join company_category_relations relation on relation.category_id = category.id
      join companies company on company.stock_code = relation.stock_code
-     left join evidences evidence on evidence.relation_id = relation.id and evidence.is_expired = 0
+     left join evidences evidence on evidence.relation_id = relation.id and (${effectiveEvidenceSql("evidence")})
      where category.is_active = 1
+       and (
+         relation.is_watchlist = 1
+         or exists (select 1 from company_research_profiles profile where profile.stock_code = relation.stock_code)
+         or exists (
+           select 1 from evidences active_evidence
+           where active_evidence.relation_id = relation.id
+             and (${effectiveEvidenceSql("active_evidence")})
+         )
+       )
      group by category.id
      having count(distinct relation.stock_code) >= 2
      order by evidenceCount desc, companyCount desc, category.id
@@ -381,11 +404,13 @@ function listCategoryArtifacts(db: Database.Database): ResearchArtifact[] {
 
   return rows.flatMap((row, index) => {
     const companies = row.companyNames.split(",").filter(Boolean);
-    const completeness = clamp(38 + row.evidenceCount * 9 + row.companyCount * 3, 40, 100);
+    const structureScore = Math.min(25, Math.round(row.companyCount / 10 * 25));
+    const evidenceDensity = row.evidenceCount / Math.max(1, row.companyCount);
+    const completeness = clamp(structureScore + Math.round(Math.min(1, evidenceDensity) * 75), 0, 100);
     const snapshot: ResearchArtifact = {
       id: `snapshot-${row.categoryId}`,
       kind: "snapshot",
-      stage: row.evidenceCount ? "ready" : "needs_work",
+      stage: evidenceDensity >= 0.5 ? "ready" : "needs_work",
       title: `${row.categoryName}产业链图谱快照`,
       summary: `覆盖 ${row.companyCount} 家相关公司和 ${row.evidenceCount} 条有效证据，呈现当前细分环节的公司关系与证据密度。`,
       content: [`# ${row.categoryName}产业链图谱快照`, `- 相关公司：${row.companyCount} 家`, `- 有效证据：${row.evidenceCount} 条`, `- 代表公司：${companies.slice(0, 8).join("、") || "待补"}`].join("\n"),
@@ -405,7 +430,7 @@ function listCategoryArtifacts(db: Database.Database): ResearchArtifact[] {
       ...snapshot,
       id: `comparison-${row.categoryId}`,
       kind: "comparison",
-      stage: row.evidenceCount >= 2 ? "ready" : "draft",
+      stage: row.evidenceCount >= 2 && evidenceDensity >= 0.5 ? "ready" : "draft",
       title: `${row.categoryName}同赛道公司对比`,
       summary: `${companies.slice(0, 4).join("、")}等 ${row.companyCount} 家公司被纳入同赛道矩阵，可继续核验业务占比、技术路线与客户结构。`,
       content: [`# ${row.categoryName}同赛道公司对比`, "", `## 对比范围\n${companies.join("、")}`, `## 当前证据\n已沉淀 ${row.evidenceCount} 条关系证据。`, "## 下一步\n补充收入结构、毛利率、客户与订单变化。"].join("\n\n"),
@@ -463,4 +488,13 @@ function clamp(value: number, min: number, max: number) {
 function isWithinDays(value: string, days: number) {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) && Date.now() - timestamp <= days * 86_400_000;
+}
+
+function isTraceableCitation(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

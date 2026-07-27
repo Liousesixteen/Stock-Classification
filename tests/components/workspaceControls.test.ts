@@ -16,6 +16,7 @@ function PanelHarness() {
     { "data-testid": "panel-layout", style: controls.style },
     createElement(ResizablePanelControls, {
       layout: controls.layout,
+      bounds: controls.bounds,
       onResize: controls.resize,
       onResizeByKeyboard: controls.resizeByKeyboard,
       onToggle: controls.toggle,

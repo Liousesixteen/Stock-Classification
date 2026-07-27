@@ -1,6 +1,6 @@
 {
   "name": "stock-classification",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "private": true,
   "engines": {
     "node": ">=24 <25"
@@ -14,9 +14,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:release-artifacts": "node --test scripts/check-release-artifacts.test.mjs",
     "validate:providers": "RUN_LIVE_PROVIDER_TESTS=1 vitest run tests/live/providerAcceptance.live.test.ts",
     "lint": "eslint .",
     "security:check": "node scripts/check-secrets.mjs",
+    "release:check": "node scripts/check-release-artifacts.mjs --root=.next/standalone",
     "db:backup": "node scripts/backup-database.mjs",
     "db:restore": "node scripts/restore-database.mjs",
     "ops:check": "node scripts/operations-check.mjs"

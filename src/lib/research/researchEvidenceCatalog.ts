@@ -1,4 +1,5 @@
 import type { CompanyResearchFacts } from "@/lib/agents/deepseekResearchAgent";
+import { hasTraceableSourceUrl, isEffectiveEvidence } from "./evidenceTrust";
 
 export type ResearchCitation = {
   id: string;
@@ -14,6 +15,11 @@ export function buildResearchEvidenceCatalog(facts: CompanyResearchFacts): Resea
   const citations = new Map<string, ResearchCitation>();
 
   facts.evidence.forEach((row, index) => {
+    if (!isEffectiveEvidence({
+      isExpired: booleanOrNumber(row.isExpired),
+      verificationStatus: text(row.verificationStatus),
+      url: text(row.url),
+    })) return;
     const title = text(row.title) || `关系证据 ${index + 1}`;
     addCitation(citations, {
       id: `evidence:${text(row.id) || index + 1}`,
@@ -28,6 +34,9 @@ export function buildResearchEvidenceCatalog(facts: CompanyResearchFacts): Resea
 
   facts.fieldFacts.forEach((row, index) => {
     if (text(row.status) !== "available") return;
+    const verificationStatus = text(row.verificationStatus);
+    if (verificationStatus === "conflicted" || verificationStatus === "rejected") return;
+    if (verificationStatus !== "verified" && !hasTraceableSourceUrl(text(row.sourceUrl))) return;
     const fieldKey = text(row.fieldKey) || `field-${index + 1}`;
     const provider = text(row.provider) || "字段数据源";
     addCitation(citations, {
@@ -41,23 +50,14 @@ export function buildResearchEvidenceCatalog(facts: CompanyResearchFacts): Resea
     });
   });
 
-  facts.relations.forEach((row, index) => {
-    const rationale = text(row.rationale);
-    if (!rationale) return;
-    addCitation(citations, {
-      id: `relation:${text(row.id) || index + 1}`,
-      title: `${text(row.categoryName) || "产业分类"} · ${text(row.relationType) || "关系"}`,
-      sourceType: "产业关系",
-      sourceDate: text(row.observedAt) || text(row.updatedAt),
-      url: "",
-      excerpt: rationale,
-      credibility: confidence(row.confidence),
-    });
-  });
-
   facts.graphRelations.forEach((row, relationIndex) => {
     const previews = Array.isArray(row.evidencePreviews) ? row.evidencePreviews.filter(isRecord) : [];
     previews.forEach((preview, index) => {
+      if (!isEffectiveEvidence({
+        isExpired: booleanOrNumber(preview.isExpired),
+        verificationStatus: text(preview.verificationStatus),
+        url: text(preview.url),
+      })) return;
       addCitation(citations, {
         id: `graph-evidence:${text(preview.id) || `${relationIndex + 1}-${index + 1}`}`,
         title: text(preview.title) || `${text(row.entityName) || "外部实体"}关系证据`,
@@ -67,20 +67,6 @@ export function buildResearchEvidenceCatalog(facts: CompanyResearchFacts): Resea
         excerpt: text(preview.excerpt) || text(row.rationale),
         credibility: confidence(preview.credibility),
       });
-    });
-  });
-
-  facts.notes.forEach((row, index) => {
-    const content = text(row.content);
-    if (!content) return;
-    addCitation(citations, {
-      id: `note:${text(row.id) || index + 1}`,
-      title: text(row.noteType) || "研究备注",
-      sourceType: "研究备注",
-      sourceDate: text(row.updatedAt) || text(row.createdAt),
-      url: "",
-      excerpt: content,
-      credibility: "低",
     });
   });
 
@@ -105,6 +91,11 @@ function valueText(value: unknown) {
   } catch {
     return "";
   }
+}
+
+function booleanOrNumber(value: unknown) {
+  if (value === true || value === false || value === 1 || value === 0) return value;
+  return false;
 }
 
 function confidence(value: unknown): ResearchCitation["credibility"] {

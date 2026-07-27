@@ -21,19 +21,6 @@ export type StockProfileProvider = {
   cacheTtlMs: number;
 };
 
-const DEFAULT_STOCK_PROFILE_PROVIDER_ORDER: StockProfileProviderId[] = [
-  "eastmoney_push2",
-  "tencent_quote",
-  "eastmoney_f10_company_survey",
-  "eastmoney_f10_business_analysis",
-  "baidu_related_blocks",
-  "cninfo_announcements",
-  "eastmoney_reports",
-  "sina_income_statement",
-  "sina_balance_sheet",
-  "sina_cash_flow",
-];
-
 const PROVIDER_LABELS: Record<StockProfileProviderId, string> = {
   eastmoney_push2: "东方财富 push2 基础资料",
   tencent_quote: "腾讯财经实时估值",
@@ -75,11 +62,8 @@ const PROVIDER_CACHE_TTL_MS: Record<StockProfileProviderId, number> = {
 
 export function getStockProfileProviderPlan(input?: { providerOrder?: string[]; envValue?: string }): StockProfileProvider[] {
   const providerOrder = normalizeProviderOrder(input);
-  const withRequiredBase: StockProfileProviderId[] = providerOrder.includes("eastmoney_push2")
-    ? providerOrder
-    : ["eastmoney_push2", ...providerOrder];
 
-  return withRequiredBase.map((id) => ({
+  return providerOrder.map((id) => ({
     id,
     label: PROVIDER_LABELS[id],
     required: id === "eastmoney_push2",
@@ -106,12 +90,17 @@ export function getStockProfileProviderCacheTtlMs(id: StockProfileProviderId) {
 
 function normalizeProviderOrder(input?: { providerOrder?: string[]; envValue?: string }) {
   const configuredOrder = input?.providerOrder ?? parseProviderOrder(input?.envValue ?? process.env.STOCK_PROFILE_SOURCE_PRIORITY);
+  const invalid = configuredOrder.filter((provider) => !isStockProfileProviderId(provider));
+  if (invalid.length > 0) {
+    throw new Error(`未知股票数据 Provider：${invalid.join("、")}`);
+  }
   const normalizedOrder: StockProfileProviderId[] = configuredOrder.filter(isStockProfileProviderId);
-  return dedupe(normalizedOrder.length > 0 ? normalizedOrder : DEFAULT_STOCK_PROFILE_PROVIDER_ORDER);
+  return dedupe(normalizedOrder);
 }
 
 function parseProviderOrder(value?: string) {
   if (!value) return [];
+  if (["disabled", "none", "off"].includes(value.trim().toLocaleLowerCase())) return [];
   return value
     .split(",")
     .map((provider) => provider.trim())

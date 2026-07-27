@@ -69,9 +69,14 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
   const loadQueue = useCallback(() => {
     let active = true;
     setLoadStatus("loading");
-    const promise = fetch(`/api/research-queue?retry=${reloadKey}`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() as Promise<ResearchQueueData> : Promise.reject(new Error("queue unavailable")))
-      .then((payload) => {
+    const promise = fetch(`/api/research-queue?retry=${reloadKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reconcile" }),
+      cache: "no-store",
+    })
+      .then((response) => response.ok ? response.json() as Promise<{ queue: ResearchQueueData }> : Promise.reject(new Error("queue unavailable")))
+      .then(({ queue: payload }) => {
         if (!active) return;
         setData(payload);
         setLoadStatus("ready");
@@ -172,7 +177,7 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
       </div>
 
       <div className="task-center-layout">
-        <ResizablePanelControls layout={panels.layout} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
+        <ResizablePanelControls layout={panels.layout} bounds={panels.bounds} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
         <aside className="task-filter-rail">
           <FilterSection title="任务分类">
             {filterMeta.map(({ id, label, icon: Icon, hint }) => <button type="button" key={id} className={filter === id ? "is-active" : ""} onClick={() => setFilter(id)}><Icon aria-hidden="true" /><span>{label}<small>{hint}</small></span><b>{id === "全部" ? data?.items.length ?? 0 : data?.stats[id] ?? 0}</b></button>)}
@@ -186,7 +191,7 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
           </FilterSection>
         </aside>
 
-        <main className="task-list-panel">
+        <section className="task-list-panel" aria-label="任务列表">
           <div className="task-list-heading"><span>共 {items.length} 项任务</span>{batchMode && batchSelection.size ? <button type="button" onClick={() => { const first = items.find((item) => batchSelection.has(item.taskId)); if (first) openTarget(first); }}>处理已选 {batchSelection.size} 项<ArrowRight aria-hidden="true" /></button> : null}</div>
           {loadStatus === "loading" && !data ? <WorkspaceState compact state="loading" title="正在计算研究任务" description="检测字段、证据、关系与报告质量" /> : null}
           {loadStatus === "error" ? <WorkspaceState compact state="error" title="任务中心加载失败" description="已有任务状态不会丢失，可原地重新读取。" onAction={() => setReloadKey((value) => value + 1)} /> : null}
@@ -194,7 +199,7 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
           <div className="task-list-scroll">
             {items.map((item) => <TaskRow key={item.taskId} item={item} active={selectedItem?.taskId === item.taskId} batchMode={batchMode} checked={batchSelection.has(item.taskId)} onCheck={() => toggleBatch(item.taskId)} onSelect={() => setSelectedTaskId(item.taskId)} onOpen={() => item.taskType === "sync_failure" ? void runTaskAction(item, "retry") : openTarget(item)} busy={actionTaskId === item.taskId} />)}
           </div>
-        </main>
+        </section>
 
         <aside className="task-detail-panel">
           {selectedItem ? <TaskDetail item={selectedItem} onOpen={() => openTarget(selectedItem)} onAction={(action) => runTaskAction(selectedItem, action)} busy={actionTaskId === selectedItem.taskId} error={actionError} /> : <div className="task-center-state"><ListChecks aria-hidden="true" />请选择一项任务查看执行详情</div>}
@@ -214,7 +219,7 @@ function FilterSection({ title, children }: { title: string; children: ReactNode
 
 function TaskRow({ item, active, batchMode, checked, onCheck, onSelect, onOpen, busy }: { item: ResearchQueueItem; active: boolean; batchMode: boolean; checked: boolean; onCheck: () => void; onSelect: () => void; onOpen: () => void; busy: boolean }) {
   const meta = taskMeta(item);
-  const target = evidenceTarget(item);
+  const target = 1;
   const progress = Math.min(100, Math.round(item.evidenceCount / target * 100));
   return <article className={`task-row ${active ? "is-active" : ""}`}>
     {batchMode ? <label className="task-select"><input type="checkbox" checked={checked} onChange={onCheck} aria-label={`选择 ${item.shortName}`} /><span><Check aria-hidden="true" /></span></label> : <span className={`task-company-icon is-${meta.tone}`}><Building2 aria-hidden="true" /></span>}
@@ -224,7 +229,7 @@ function TaskRow({ item, active, batchMode, checked, onCheck, onSelect, onOpen, 
       <span className={`task-kind is-${meta.tone}`}>{meta.label}</span>
       <span className="task-description"><b>{meta.description}</b><small>关联赛道　{item.categoryName} · {item.relationType}</small></span>
       <span className="task-evidence"><small>证据</small><b>{item.evidenceCount}/{target}</b><i><u style={{ width: `${progress}%` }} /></i></span>
-      <span className="task-confidence"><b>{confidenceScore(item)}%</b><small>置信度</small></span>
+      <span className="task-confidence"><b>{item.confidence || "待定"}</b><small>置信等级</small></span>
       <span className="task-updated"><small>更新</small><b>{formatDateTime(item.updatedAt)}</b></span>
     </button>
     <button className="task-action" type="button" onClick={onOpen} disabled={busy}>{busy ? "处理中" : meta.action}</button>
@@ -235,7 +240,7 @@ function TaskRow({ item, active, batchMode, checked, onCheck, onSelect, onOpen, 
 function TaskDetail({ item, onOpen, onAction, busy, error }: { item: ResearchQueueItem; onOpen: () => void; onAction: (action: "start" | "complete" | "dismiss" | "retry") => void; busy: boolean; error: string }) {
   const meta = taskMeta(item);
   const requirements = evidenceRequirements(item);
-  const target = evidenceTarget(item);
+  const target = 1;
   return <>
     <header className="task-detail-heading"><span>任务详情</span><MoreVertical aria-hidden="true" /></header>
     <section className="task-detail-summary">
@@ -284,8 +289,6 @@ function taskMeta(item: ResearchQueueItem) {
 
 function priorityTone(priority: number) { return priority >= 70 ? "high" : priority >= 30 ? "medium" : "low"; }
 function priorityLabel(priority: number) { return priority >= 70 ? "高优" : priority >= 30 ? "中优" : "低优"; }
-function evidenceTarget(item: ResearchQueueItem) { return Math.max(3, Math.min(5, item.evidenceCount + (item.evidenceCount < 2 ? 3 : 2))); }
-function confidenceScore(item: ResearchQueueItem) { return item.confidence === "高" ? 86 : item.confidence === "中" ? 64 : 40; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "待更新" : `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`; }
 function detailDescription(item: ResearchQueueItem) { return `核验${item.shortName}与“${item.categoryName}”之间的${item.relationType}关系，补齐可追溯资料并确认当前${item.confidence}置信度判断是否成立。`; }
 
@@ -308,7 +311,7 @@ function evidenceRequirements(item: ResearchQueueItem) {
     { label: "产业链上下游与供需关系佐证", done: item.evidenceCount >= 3 },
     { label: "第三方研报或权威来源交叉验证", done: item.evidenceCount >= 4 },
     { label: "关系结论、边界与置信度说明", done: item.relationType !== "待验证" && item.confidence !== "低" },
-  ].slice(0, evidenceTarget(item));
+  ].slice(0, 1);
 }
 
 function systemSuggestions(item: ResearchQueueItem) {

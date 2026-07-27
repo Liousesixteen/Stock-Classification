@@ -584,17 +584,6 @@ export function seedSemiconductorData(db: Database.Database) {
     values (@name, @parentId, @level, @sortOrder, @aliases, @description, @industry)
   `);
 
-  const updateCategory = db.prepare(`
-    update categories
-    set level = @level,
-        sort_order = @sortOrder,
-        aliases = @aliases,
-        description = @description,
-        industry = @industry,
-        updated_at = current_timestamp
-    where id = @id
-  `);
-
   const findRootCategory = db.prepare("select id from categories where name = ? and parent_id is null");
   const findChildCategory = db.prepare("select id from categories where name = ? and parent_id = ?");
 
@@ -621,19 +610,10 @@ export function seedSemiconductorData(db: Database.Database) {
       @intro,
       @mainBusiness
     )
-    on conflict(stock_code) do update set
-      short_name = excluded.short_name,
-      full_name = excluded.full_name,
-      board = excluded.board,
-      industry = excluded.industry,
-      region = excluded.region,
-      market_cap_band = excluded.market_cap_band,
-      intro = excluded.intro,
-      main_business = excluded.main_business,
-      updated_at = current_timestamp
+    on conflict(stock_code) do nothing
   `);
 
-  const upsertRelation = db.prepare(`
+  const insertRelation = db.prepare(`
     insert into company_category_relations (
       stock_code,
       category_id,
@@ -650,11 +630,7 @@ export function seedSemiconductorData(db: Database.Database) {
       @rationale,
       0
     )
-    on conflict(stock_code, category_id) do update set
-      relation_type = excluded.relation_type,
-      confidence = excluded.confidence,
-      rationale = excluded.rationale,
-      updated_at = current_timestamp
+    on conflict(stock_code, category_id) do nothing
   `);
 
   const ensureCategory = (node: CategorySeed, parentId: number | null, level: number, sortOrder: number) => {
@@ -673,9 +649,6 @@ export function seedSemiconductorData(db: Database.Database) {
       : findChildCategory.get(node.name, parentId)) as { id: number } | undefined;
 
     const id = existing?.id ?? Number(insertCategory.run(values).lastInsertRowid);
-    if (existing) {
-      updateCategory.run({ ...values, id });
-    }
 
     node.stocks?.forEach((stock) => {
       insertCompany.run({
@@ -689,7 +662,7 @@ export function seedSemiconductorData(db: Database.Database) {
         intro: stock.intro,
         mainBusiness: stock.mainBusiness,
       });
-      upsertRelation.run({
+      insertRelation.run({
         stockCode: stock.stockCode,
         categoryId: id,
         relationType: stock.relationType ?? "重要相关",

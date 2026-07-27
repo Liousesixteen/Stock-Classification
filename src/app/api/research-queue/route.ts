@@ -7,6 +7,7 @@ import {
   dismissResearchTask,
   getResearchTask,
   startResearchTask,
+  syncAutomaticResearchTasks,
 } from "@/lib/repositories/researchTasks";
 import { enqueueCompanyProfileSyncTask } from "@/lib/research/companySyncQueue";
 import { runSyncTaskWithRetries } from "@/lib/research/syncTaskWorker";
@@ -18,11 +19,14 @@ export async function GET() {
   return NextResponse.json(getResearchQueue(getDatabase()), { headers: { "Cache-Control": "no-store" } });
 }
 
-const actionSchema = z.object({
-  taskId: z.number().int().positive(),
-  action: z.enum(["start", "complete", "dismiss", "retry"]),
-  resolution: z.string().trim().max(500).optional(),
-});
+const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("reconcile") }),
+  z.object({
+    taskId: z.number().int().positive(),
+    action: z.enum(["start", "complete", "dismiss", "retry"]),
+    resolution: z.string().trim().max(500).optional(),
+  }),
+]);
 
 async function postTaskAction(request: Request) {
   const parsed = actionSchema.safeParse(await request.json().catch(() => ({})));
@@ -30,6 +34,10 @@ async function postTaskAction(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "任务操作无效" }, { status: 400 });
   }
   const db = getDatabase();
+  if (parsed.data.action === "reconcile") {
+    syncAutomaticResearchTasks(db);
+    return NextResponse.json({ queue: getResearchQueue(db) });
+  }
   const current = getResearchTask(db, parsed.data.taskId);
   if (!current) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
 

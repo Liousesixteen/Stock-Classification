@@ -47,6 +47,7 @@ describe("buildIndustryGraph", () => {
         relationType: "主营业务",
         confidence: "高",
         evidenceCount: 12,
+        verificationStatus: "verified",
       },
     ]);
 
@@ -94,6 +95,7 @@ describe("buildIndustryGraph", () => {
         relationType: "重要相关",
         confidence: "高",
         evidenceCount: 2,
+        verificationStatus: "verified",
       },
       {
         categoryId: 2,
@@ -110,6 +112,7 @@ describe("buildIndustryGraph", () => {
         relationType: "主营业务",
         confidence: "高",
         evidenceCount: 4,
+        verificationStatus: "verified",
       },
     ] as const;
 

@@ -34,6 +34,8 @@ describe("company evidence timeline", () => {
       excerpt: "披露光刻胶业务进展。",
       credibility: "高",
       isExpired: false,
+      verificationStatus: "unverified",
+      verifiedAt: "",
     };
     const timeline = buildCompanyEvidenceTimeline({
       relations: [{ id: 3, categoryName: "光刻胶", relationType: "主营业务" }],
@@ -59,7 +61,39 @@ describe("company evidence timeline", () => {
       url: "https://example.com/notice",
     }));
     expect(timeline[2]?.summary).toContain("研究机构");
-    expect(timeline[3]).toEqual(expect.objectContaining({ fieldKey: "chainPosition", statusLabel: "关系佐证" }));
+    expect(timeline[3]).toEqual(expect.objectContaining({ fieldKey: "chainPosition", status: "available", statusLabel: "来源可用" }));
+  });
+
+  it("does not present untraceable or rejected relation material as verified evidence", () => {
+    const base: Evidence = {
+      id: 8,
+      relationId: 3,
+      sourceType: "其他",
+      title: "自动归纳资料",
+      sourceDate: "",
+      url: "",
+      excerpt: "模型生成的关系线索。",
+      credibility: "中",
+      isExpired: false,
+      verificationStatus: "unverified",
+      verifiedAt: "",
+    };
+    const timeline = buildCompanyEvidenceTimeline({
+      relations: [{ id: 3, categoryName: "光刻胶", relationType: "待验证" }],
+      evidenceByRelationId: {
+        3: [
+          base,
+          { ...base, id: 9, title: "已驳回自动归纳", verificationStatus: "rejected" },
+        ],
+      },
+      fieldFacts: [],
+      researchProfile: null,
+    });
+
+    expect(timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "relation-evidence:9", status: "conflicted", statusLabel: "已驳回" }),
+      expect.objectContaining({ id: "relation-evidence:8", status: "unverified", statusLabel: "待核验" }),
+    ]));
   });
 
   it("keeps failed field updates visible as actionable provenance events", () => {

@@ -4,6 +4,7 @@ import { listCompanyGraphEntityRelations } from "@/lib/repositories/graphEntitie
 import { listCompanyNotes } from "@/lib/repositories/notes";
 import { getSectorResearch } from "@/lib/repositories/sectorResearch";
 import { buildCompanyDossierModel } from "./companyDossierModel";
+import { effectiveEvidenceSql } from "./evidenceTrust";
 
 export function buildCompanyResearchFacts(db: Database.Database, stockCode: string, categoryId: number | null): CompanyResearchFacts | null {
   const dossier = buildCompanyDossierModel(db, stockCode);
@@ -50,6 +51,8 @@ export function buildIndustryResearchFacts(db: Database.Database, categoryId: nu
       )
       select evidence.id, evidence.source_type as sourceType, evidence.title,
         evidence.source_date as sourceDate, evidence.url, evidence.excerpt, evidence.credibility,
+        evidence.is_expired as isExpired, evidence.verification_status as verificationStatus,
+        evidence.verified_at as verifiedAt,
         relation.id as relationId, relation.relation_type as relationType,
         category.id as categoryId, category.name as categoryName,
         company.stock_code as stockCode, company.short_name as shortName
@@ -58,7 +61,7 @@ export function buildIndustryResearchFacts(db: Database.Database, categoryId: nu
       join branch on branch.id = relation.category_id
       join categories category on category.id = relation.category_id
       join companies company on company.stock_code = relation.stock_code
-      where evidence.is_expired = 0
+      where ${effectiveEvidenceSql("evidence")}
       order by evidence.source_date desc, evidence.id desc
       limit 160
     `,
@@ -77,7 +80,10 @@ export function buildIndustryResearchFacts(db: Database.Database, categoryId: nu
     researchProfile: null,
     fieldFacts: [],
     dossierQuality: {
-      overallScore: Math.min(100, 35 + sector.stats.evidenceCount * 4 + Math.round(sector.stats.profileCoverage * 0.3)),
+      overallScore: Math.round(
+        Math.min(1, sector.stats.evidenceCount / Math.max(1, sector.stats.companyCount)) * 70
+        + sector.stats.profileCoverage * 0.3,
+      ),
       evidenceCount: sector.stats.evidenceCount,
       profileCoverage: sector.stats.profileCoverage,
       reliabilityLabel: sector.stats.evidenceCount > 3 ? "可研判" : "待核验",

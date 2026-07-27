@@ -167,16 +167,16 @@ describe("database schema", () => {
     expect(db.prepare("select count(*) as count from operation_audit_events").get()).toEqual({ count: 0 });
   });
 
-  it("seeds additively and does not duplicate categories", () => {
+  it("seeds additively and does not duplicate or update existing categories", () => {
     const db = new Database(":memory:");
     db.pragma("foreign_keys = ON");
     migrate(db);
 
-    db.prepare("insert into categories (name, parent_id, level, sort_order) values (?, null, ?, ?)").run(
-      "半导体",
-      0,
-      0,
-    );
+    db.prepare(`
+      insert into categories (
+        name, parent_id, level, sort_order, aliases, description, industry, updated_at
+      ) values (?, null, ?, ?, ?, ?, ?, ?)
+    `).run("半导体", 7, 91, '["人工别名"]', "人工说明", "人工行业", "2024-01-02 03:04:05");
 
     seedSemiconductorData(db);
     const firstCount = db.prepare("select count(*) as count from categories").get() as { count: number };
@@ -190,6 +190,80 @@ describe("database schema", () => {
 
     expect(krf?.name).toBe("KrF 光刻胶");
     expect(secondCount.count).toBe(firstCount.count);
+    expect(db.prepare(`
+      select level, sort_order as sortOrder, aliases, description, industry, updated_at as updatedAt
+      from categories where name = '半导体' and parent_id is null
+    `).get()).toEqual({
+      level: 7,
+      sortOrder: 91,
+      aliases: '["人工别名"]',
+      description: "人工说明",
+      industry: "人工行业",
+      updatedAt: "2024-01-02 03:04:05",
+    });
+  });
+
+  it("never overwrites existing company or relation fields when sample seeding is repeated", () => {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    seedSemiconductorData(db);
+
+    const category = db.prepare("select id from categories where name = '创新药' and parent_id is null").get() as { id: number };
+    db.prepare(`
+      update companies
+      set short_name = '人工公司名',
+          full_name = '人工公司全称',
+          board = '人工板块',
+          industry = '人工行业',
+          region = '人工地区',
+          market_cap_band = '人工市值',
+          intro = '人工简介',
+          main_business = '人工主营',
+          updated_at = '2024-02-03 04:05:06'
+      where stock_code = '688235'
+    `).run();
+    db.prepare(`
+      update company_category_relations
+      set relation_type = '待验证',
+          confidence = '低',
+          rationale = '人工关系判断',
+          is_watchlist = 1,
+          updated_at = '2024-03-04 05:06:07'
+      where stock_code = '688235' and category_id = ?
+    `).run(category.id);
+
+    seedSemiconductorData(db);
+    seedSemiconductorData(db);
+
+    expect(db.prepare(`
+      select short_name as shortName, full_name as fullName, board, industry, region,
+             market_cap_band as marketCapBand, intro, main_business as mainBusiness,
+             updated_at as updatedAt
+      from companies where stock_code = '688235'
+    `).get()).toEqual({
+      shortName: "人工公司名",
+      fullName: "人工公司全称",
+      board: "人工板块",
+      industry: "人工行业",
+      region: "人工地区",
+      marketCapBand: "人工市值",
+      intro: "人工简介",
+      mainBusiness: "人工主营",
+      updatedAt: "2024-02-03 04:05:06",
+    });
+    expect(db.prepare(`
+      select relation_type as relationType, confidence, rationale, is_watchlist as isWatchlist,
+             updated_at as updatedAt
+      from company_category_relations
+      where stock_code = '688235' and category_id = ?
+    `).get(category.id)).toEqual({
+      relationType: "待验证",
+      confidence: "低",
+      rationale: "人工关系判断",
+      isWatchlist: 1,
+      updatedAt: "2024-03-04 05:06:07",
+    });
   });
 
   it("seeds the sample company", () => {
@@ -279,6 +353,38 @@ describe("database schema", () => {
     expect(fs.existsSync(secondPath)).toBe(true);
   });
 
+  it("creates an empty database when bootstrap mode is not configured", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stock-classification-empty-db-"));
+    tempDirs.push(tempDir);
+    const dbPath = path.join(tempDir, "empty.sqlite");
+    const previousMode = process.env.STOCK_BOOTSTRAP_MODE;
+    delete process.env.STOCK_BOOTSTRAP_MODE;
+
+    try {
+      const db = getDatabase(dbPath);
+      expect(db.prepare("select count(*) as count from categories").get()).toEqual({ count: 0 });
+      expect(db.prepare("select count(*) as count from companies").get()).toEqual({ count: 0 });
+    } finally {
+      restoreEnvironmentVariable("STOCK_BOOTSTRAP_MODE", previousMode);
+    }
+  });
+
+  it("adds sample records only when bootstrap mode is sample", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stock-classification-sample-db-"));
+    tempDirs.push(tempDir);
+    const dbPath = path.join(tempDir, "sample.sqlite");
+    const previousMode = process.env.STOCK_BOOTSTRAP_MODE;
+    process.env.STOCK_BOOTSTRAP_MODE = "sample";
+
+    try {
+      const db = getDatabase(dbPath);
+      expect((db.prepare("select count(*) as count from categories").get() as { count: number }).count).toBeGreaterThan(0);
+      expect((db.prepare("select count(*) as count from companies").get() as { count: number }).count).toBeGreaterThan(0);
+    } finally {
+      restoreEnvironmentVariable("STOCK_BOOTSTRAP_MODE", previousMode);
+    }
+  });
+
   it("adds durable queue columns to an existing sync_tasks table", () => {
     const db = new Database(":memory:");
     db.exec(`
@@ -341,3 +447,8 @@ describe("database schema", () => {
     expect(versions.map((column) => column.name)).toEqual(expect.arrayContaining(["report_id", "version_number", "change_summary", "source"]));
   });
 });
+
+function restoreEnvironmentVariable(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

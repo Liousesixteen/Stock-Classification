@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { IndustryGraphEvidencePreview, IndustryGraphRelationRow } from "@/lib/industry-graph/types";
+import { effectiveEvidenceSql } from "@/lib/research/evidenceTrust";
 
 type RelationRow = Omit<IndustryGraphRelationRow, "evidencePreviews" | "isWatchlist" | "relationId"> & { relationId: number; isWatchlist: number };
 
@@ -28,7 +29,7 @@ export function listIndustryGraphRelations(db: Database.Database): IndustryGraph
         from company_category_relations r
         join companies c on c.stock_code = r.stock_code
         join categories category on category.id = r.category_id and category.is_active = 1
-        left join evidences e on e.relation_id = r.id and e.is_expired = 0
+        left join evidences e on e.relation_id = r.id and (${effectiveEvidenceSql("e")})
         group by r.id
         order by r.category_id, r.stock_code
       `,
@@ -49,9 +50,13 @@ export function listIndustryGraphRelations(db: Database.Database): IndustryGraph
           credibility,
           source_date as sourceDate,
           url,
-          excerpt
+          excerpt,
+          verification_status as verificationStatus,
+          verified_at as verifiedAt,
+          is_expired as isExpired
         from evidences
-        where is_expired = 0 and relation_id in (${placeholders})
+        where (${effectiveEvidenceSql("evidences")})
+          and relation_id in (${placeholders})
         order by relation_id, source_date desc, id desc
       `,
     ).all(...relationIds) as Array<IndustryGraphEvidencePreview & { relationId: number }>;
@@ -66,6 +71,9 @@ export function listIndustryGraphRelations(db: Database.Database): IndustryGraph
           sourceDate: evidence.sourceDate,
           url: evidence.url,
           excerpt: evidence.excerpt,
+          verificationStatus: evidence.verificationStatus,
+          verifiedAt: evidence.verifiedAt,
+          isExpired: Boolean(evidence.isExpired),
         });
       }
       evidenceByRelationId.set(evidence.relationId, previews);

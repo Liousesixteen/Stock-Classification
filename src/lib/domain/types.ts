@@ -7,6 +7,7 @@ import type {
   RELATION_TYPES,
   SOURCE_TYPES,
 } from "./constants";
+import type { EvidenceVerificationStatus } from "@/lib/research/evidenceTrust";
 
 export type RelationType = (typeof RELATION_TYPES)[number];
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
@@ -70,8 +71,8 @@ export type Evidence = {
   excerpt: string;
   credibility: ConfidenceLevel;
   isExpired: boolean;
-  verificationStatus?: "unverified" | "verified";
-  verifiedAt?: string;
+  verificationStatus: EvidenceVerificationStatus;
+  verifiedAt: string;
 };
 
 export type ResearchNote = {

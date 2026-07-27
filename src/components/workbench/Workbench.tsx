@@ -95,7 +95,7 @@ export function Workbench() {
             }}
             onOpenQueue={() => changeMode("queue")}
           />
-          <button type="button" className="workspace-profile" title="账户与偏好设置">
+          <button type="button" className="workspace-profile" title="账户与偏好设置" aria-label="账户与偏好设置">
             <span>N</span><ChevronDown aria-hidden="true" />
           </button>
         </div>
@@ -110,6 +110,8 @@ export function Workbench() {
             focusTask={researchFocusTask}
             onSelectCompany={openCompanyFromContext}
             onOpenAtlas={() => changeMode("atlas")}
+            onOpenResults={() => changeMode("results")}
+            onOpenQueue={() => changeMode("queue")}
             onOpenSector={(categoryId) => {
               setSectorCategoryId(categoryId);
               changeMode("sector");

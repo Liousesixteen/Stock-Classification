@@ -36,6 +36,32 @@ const queue = {
   }],
   stats: { 已关注: 1, 待复核: 0, 缺证据: 0, 待建档: 0 },
 };
+const dashboard = {
+  mode: "active",
+  stats: {
+    catalogCompanies: 1,
+    activeCompanies: 1,
+    activeCategories: 1,
+    researchProfiles: 1,
+    effectiveEvidence: 1,
+    reports: 0,
+    aiRuns: 0,
+    openTasks: 1,
+    watchlist: 1,
+  },
+  companies: [{
+    stockCode: "600030",
+    shortName: "中信证券",
+    categoryId: 10,
+    categoryName: "证券",
+    evidenceCount: 1,
+    hasResearchProfile: true,
+    isWatchlist: true,
+    isStarterExample: false,
+    updatedAt: "2026-07-13",
+  }],
+  recentArtifacts: [],
+};
 
 describe("ResearchWorkbench", () => {
   afterEach(() => {
@@ -46,7 +72,8 @@ describe("ResearchWorkbench", () => {
   it("opens on a dedicated research command center instead of the company execution view", async () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("/api/research-queue")) return Promise.resolve(new Response(JSON.stringify(queue), { status: 200 }));
+      if (url.includes("/api/research-queue")) return Promise.resolve(new Response(JSON.stringify({ queue }), { status: 200 }));
+      if (url.includes("/api/research-dashboard")) return Promise.resolve(new Response(JSON.stringify(dashboard), { status: 200 }));
       if (url.includes("/api/quality")) return Promise.resolve(new Response(JSON.stringify({ checks: [] }), { status: 200 }));
       return Promise.resolve(new Response(JSON.stringify({}), { status: 404 }));
     }));
@@ -62,7 +89,7 @@ describe("ResearchWorkbench", () => {
       onChanged: vi.fn(),
     }));
 
-    expect(screen.getByRole("heading", { name: "研究工作台总览" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "研究工作台总览" })).toBeVisible();
     expect(screen.getByRole("button", { name: /AI 研究/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "产业链图谱" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "研究行动" })).not.toBeInTheDocument();
@@ -74,7 +101,8 @@ describe("ResearchWorkbench", () => {
 
   it("opens universal AI tools without requiring a selected queue company", async () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
-      if (String(input).includes("/api/research-queue")) return Promise.resolve(new Response(JSON.stringify(queue), { status: 200 }));
+      if (String(input).includes("/api/research-queue")) return Promise.resolve(new Response(JSON.stringify({ queue }), { status: 200 }));
+      if (String(input).includes("/api/research-dashboard")) return Promise.resolve(new Response(JSON.stringify(dashboard), { status: 200 }));
       return Promise.resolve(new Response(JSON.stringify({}), { status: 404 }));
     }));
 
@@ -88,7 +116,7 @@ describe("ResearchWorkbench", () => {
       onChanged: vi.fn(),
     }));
 
-    const askButton = screen.getByRole("button", { name: /AI 研究/ });
+    const askButton = await screen.findByRole("button", { name: /AI 研究/ });
     expect(askButton).toBeEnabled();
 
     fireEvent.click(askButton);

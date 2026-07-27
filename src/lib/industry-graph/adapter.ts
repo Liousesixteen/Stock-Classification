@@ -136,6 +136,7 @@ export function buildIndustryGraph(
           credibility: preview.credibility,
           url: preview.url ?? "",
           excerpt: preview.excerpt ?? "",
+          verificationStatus: preview.verificationStatus ?? "unverified",
           layoutSeed: stableSeed(evidenceNodeId),
         };
         evidences.set(evidenceNodeId, evidenceNode);
@@ -252,6 +253,7 @@ export function buildIndustryGraph(
       direction: relation.direction ?? "undirected",
       strength: relation.strength ?? 50,
       observedAt: relation.observedAt ?? "",
+      verificationStatus: relation.verificationStatus ?? "unverified",
     });
     addEvidenceNodes("entity", entityId, relation.relationId, relation.evidencePreviews);
   }
@@ -267,8 +269,8 @@ export function buildIndustryGraph(
       categoryCount: nodes.filter((node) => node.kind === "category").length,
       companyCount: companies.size,
       evidenceCount: relations.reduce((sum, relation) => sum + relation.evidenceCount, 0) + entityRelations.reduce((sum, relation) => sum + relation.evidenceCount, 0),
-      verifiedRelationCount: relationEdges.filter((edge) => (edge.kind === "relation" && edge.verificationStatus === "verified") || (edge.evidenceCount > 0 && edge.confidence !== "低" && (edge.kind !== "relation" || edge.relationType !== "待验证"))).length,
-      unverifiedRelationCount: relationEdges.filter((edge) => (edge.kind !== "relation" || edge.verificationStatus !== "verified") && (edge.evidenceCount === 0 || edge.confidence === "低" || (edge.kind === "relation" && edge.relationType === "待验证"))).length,
+      verifiedRelationCount: relationEdges.filter((edge) => edge.verificationStatus === "verified").length,
+      unverifiedRelationCount: relationEdges.filter((edge) => edge.verificationStatus !== "verified").length,
       watchlistCount: relationEdges.filter((edge) => edge.isWatchlist).length,
       entityCount: entities.size,
       evidenceNodeCount: evidences.size,

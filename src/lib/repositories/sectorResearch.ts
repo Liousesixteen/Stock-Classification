@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { effectiveEvidenceSql } from "@/lib/research/evidenceTrust";
 import type { BusinessLine } from "./researchProfiles";
 
 export type SectorResearchCompany = {
@@ -132,7 +133,7 @@ export function getSectorResearch(db: Database.Database, categoryId: number): Se
         join branch on branch.id = r.category_id
         join categories category on category.id = r.category_id
         join companies company on company.stock_code = r.stock_code
-        left join evidences e on e.relation_id = r.id and e.is_expired = 0
+        left join evidences e on e.relation_id = r.id and (${effectiveEvidenceSql("e")})
         left join company_research_profiles profile on profile.stock_code = company.stock_code
         group by r.id
         order by r.stock_code, r.category_id

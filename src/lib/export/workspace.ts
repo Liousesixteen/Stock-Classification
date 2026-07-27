@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { effectiveEvidenceSql } from "@/lib/research/evidenceTrust";
 
 type ExportFormat = "json" | "csv";
 
@@ -50,7 +51,7 @@ export function createRelationCsv(db: Database.Database) {
       from company_category_relations r
       join companies company on company.stock_code = r.stock_code
       join categories category on category.id = r.category_id
-      left join evidences e on e.relation_id = r.id and e.is_expired = 0
+      left join evidences e on e.relation_id = r.id and (${effectiveEvidenceSql("e")})
       group by r.id
       order by category.level, category.sort_order, company.stock_code
     `,

@@ -3,6 +3,7 @@ import type { CompanyFieldFact } from "@/lib/repositories/companyFieldFacts";
 import type { CompanyResearchProfile } from "@/lib/repositories/researchProfiles";
 import type { DossierRelation } from "./companyDossierQuality";
 import { isMeaningfulDossierValue, selectBestCompanyFieldFact } from "./companyDossierQuality";
+import { evidenceTrustLabel, getEvidenceTrustLevel, type EvidenceTrustLevel } from "./evidenceTrust";
 
 export type CompanyEvidenceTimelineKind = "announcement" | "research_report" | "relation_evidence" | "field_fact" | "research_profile";
 export type CompanyEvidenceTimelineStatus = "verified" | "available" | "unverified" | "conflicted" | "failed" | "expired";
@@ -129,22 +130,33 @@ function buildRelationEvidenceItems(
   evidenceByRelationId: Record<string | number, Evidence[]>,
 ) {
   return relations.flatMap((relation) =>
-    (evidenceByRelationId[String(relation.id)] ?? []).map((evidence): CompanyEvidenceTimelineItem => ({
-      id: `relation-evidence:${evidence.id}`,
-      kind: "relation_evidence",
-      kindLabel: "关系证据",
-      title: evidence.title,
-      summary: [relation.categoryName, relation.relationType, evidence.excerpt].filter(Boolean).join(" · "),
-      source: evidence.sourceType,
-      sourceDate: evidence.sourceDate,
-      timestamp: evidence.sourceDate,
-      url: evidence.url,
-      credibility: mapChineseCredibility(evidence.credibility),
-      status: evidence.isExpired ? "expired" : "verified",
-      statusLabel: evidence.isExpired ? "已过期" : "关系佐证",
-      fieldKey: "chainPosition",
-    })),
+    (evidenceByRelationId[String(relation.id)] ?? []).map((evidence): CompanyEvidenceTimelineItem => {
+      const trust = getEvidenceTrustLevel(evidence);
+      return {
+        id: `relation-evidence:${evidence.id}`,
+        kind: "relation_evidence",
+        kindLabel: "关系证据",
+        title: evidence.title,
+        summary: [relation.categoryName, relation.relationType, evidence.excerpt].filter(Boolean).join(" · "),
+        source: evidence.sourceType,
+        sourceDate: evidence.sourceDate,
+        timestamp: evidence.sourceDate,
+        url: evidence.url,
+        credibility: mapChineseCredibility(evidence.credibility),
+        status: timelineStatusForTrust(trust),
+        statusLabel: evidenceTrustLabel(trust),
+        fieldKey: "chainPosition",
+      };
+    }),
   );
+}
+
+function timelineStatusForTrust(trust: EvidenceTrustLevel): CompanyEvidenceTimelineStatus {
+  if (trust === "verified") return "verified";
+  if (trust === "source_backed") return "available";
+  if (trust === "expired") return "expired";
+  if (trust === "conflicted" || trust === "rejected") return "conflicted";
+  return "unverified";
 }
 
 function buildFieldFactItems(fieldFacts: CompanyFieldFact[]) {

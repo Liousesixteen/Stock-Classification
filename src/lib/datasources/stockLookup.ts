@@ -282,7 +282,7 @@ export async function lookupStockProfileWithTrace(
 
   const basicsResult = await runProvider({
     provider: getProvider(providerPlan, "eastmoney_push2"),
-    enabled: true,
+    enabled: isStockProfileProviderEnabled(providerPlan, "eastmoney_push2"),
     fallback: basicFallback,
     failOpen: true,
     timeoutMs: providerTimeoutMs,

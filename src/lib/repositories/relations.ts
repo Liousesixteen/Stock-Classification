@@ -71,6 +71,26 @@ export function upsertRelation(db: Database.Database, relation: RelationInput) {
         @isWatchlist
       )
       on conflict(stock_code, category_id) do update set
+        verification_status = case
+          when company_category_relations.relation_type != excluded.relation_type
+            or company_category_relations.confidence != excluded.confidence
+            or company_category_relations.rationale != excluded.rationale
+            or (@directionProvided = 1 and company_category_relations.direction != excluded.direction)
+            or (@strengthProvided = 1 and company_category_relations.strength != excluded.strength)
+            or (@observedAtProvided = 1 and company_category_relations.observed_at != excluded.observed_at)
+          then 'unverified'
+          else company_category_relations.verification_status
+        end,
+        verified_at = case
+          when company_category_relations.relation_type != excluded.relation_type
+            or company_category_relations.confidence != excluded.confidence
+            or company_category_relations.rationale != excluded.rationale
+            or (@directionProvided = 1 and company_category_relations.direction != excluded.direction)
+            or (@strengthProvided = 1 and company_category_relations.strength != excluded.strength)
+            or (@observedAtProvided = 1 and company_category_relations.observed_at != excluded.observed_at)
+          then ''
+          else company_category_relations.verified_at
+        end,
         relation_type = excluded.relation_type,
         confidence = excluded.confidence,
         rationale = excluded.rationale,

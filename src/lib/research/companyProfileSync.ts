@@ -13,9 +13,9 @@ import { getDatabase } from "@/lib/db/client";
 import { getCategoryById } from "@/lib/repositories/categories";
 import { upsertCompanyFieldFact } from "@/lib/repositories/companyFieldFacts";
 import { getCompany, upsertCompany } from "@/lib/repositories/companies";
-import { createEvidence, deleteEvidenceForRelationByTitle } from "@/lib/repositories/evidence";
+import { deleteEvidenceForRelationByTitle } from "@/lib/repositories/evidence";
 import { upsertCompanyResearchProfile } from "@/lib/repositories/researchProfiles";
-import { listRelationsForCompany, setPrimaryEvidenceForRelation, upsertRelation } from "@/lib/repositories/relations";
+import { listRelationsForCompany, upsertRelation } from "@/lib/repositories/relations";
 import { getFreshSourceSnapshot, listSourceSnapshots, upsertSourceSnapshot } from "@/lib/repositories/sourceSnapshots";
 import { updateSyncTask } from "@/lib/repositories/syncTasks";
 
@@ -280,18 +280,9 @@ function persistSyncResult(
         rationale: result.rationale,
         isWatchlist: currentRelation.isWatchlist,
       });
+      // Agent aggregation is a research clue, not an original source. Remove
+      // older synthetic rows but never promote the generated summary to evidence.
       deleteEvidenceForRelationByTitle(db, relationId, result.evidence.title);
-      const evidenceId = createEvidence(db, {
-        relationId,
-        sourceType: result.evidence.sourceType,
-        title: result.evidence.title,
-        sourceDate: result.evidence.sourceDate,
-        url: result.evidence.url,
-        excerpt: result.evidence.excerpt,
-        credibility: result.evidence.credibility,
-        isExpired: false,
-      });
-      setPrimaryEvidenceForRelation(db, relationId, evidenceId);
     }
 
     upsertCompanyResearchProfile(db, {

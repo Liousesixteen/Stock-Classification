@@ -44,7 +44,10 @@ export function upsertSourceSnapshot(db: Database.Database, snapshot: SourceSnap
         error,
         duration_ms,
         fetched_at,
-        expires_at
+        expires_at,
+        last_success_facts_json,
+        last_success_fetched_at,
+        last_success_expires_at
       )
       values (
         @stockCode,
@@ -55,7 +58,10 @@ export function upsertSourceSnapshot(db: Database.Database, snapshot: SourceSnap
         @error,
         @durationMs,
         coalesce(nullif(@fetchedAt, ''), current_timestamp),
-        @expiresAt
+        @expiresAt,
+        case when @status = 'success' then @factsJson else '{}' end,
+        case when @status = 'success' then coalesce(nullif(@fetchedAt, ''), current_timestamp) else '' end,
+        case when @status = 'success' then @expiresAt else '' end
       )
       on conflict(stock_code, provider) do update set
         provider_label = excluded.provider_label,
@@ -65,6 +71,18 @@ export function upsertSourceSnapshot(db: Database.Database, snapshot: SourceSnap
         duration_ms = excluded.duration_ms,
         fetched_at = excluded.fetched_at,
         expires_at = excluded.expires_at,
+        last_success_facts_json = case
+          when excluded.status = 'success' then excluded.facts_json
+          else company_source_snapshots.last_success_facts_json
+        end,
+        last_success_fetched_at = case
+          when excluded.status = 'success' then excluded.fetched_at
+          else company_source_snapshots.last_success_fetched_at
+        end,
+        last_success_expires_at = case
+          when excluded.status = 'success' then excluded.expires_at
+          else company_source_snapshots.last_success_expires_at
+        end,
         updated_at = current_timestamp
     `,
   ).run({
@@ -116,19 +134,19 @@ export function getFreshSourceSnapshot(db: Database.Database, stockCode: string,
           stock_code as stockCode,
           provider,
           provider_label as providerLabel,
-          status,
-          facts_json as factsJson,
-          error,
+          'success' as status,
+          last_success_facts_json as factsJson,
+          '' as error,
           duration_ms as durationMs,
-          fetched_at as fetchedAt,
-          expires_at as expiresAt,
+          last_success_fetched_at as fetchedAt,
+          last_success_expires_at as expiresAt,
           created_at as createdAt,
           updated_at as updatedAt
         from company_source_snapshots
         where stock_code = ?
           and provider = ?
-          and status = 'success'
-          and (expires_at = '' or expires_at > ?)
+          and last_success_fetched_at != ''
+          and (last_success_expires_at = '' or last_success_expires_at > ?)
         limit 1
       `,
     )
