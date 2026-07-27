@@ -1,67 +1,180 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ClassificationTree } from "./ClassificationTree";
-import { CompanyDetails } from "./CompanyDetails";
-import { ImportDialog } from "./ImportDialog";
-import { QualityPanel } from "./QualityPanel";
-import { StockTable } from "./StockTable";
-import { WorkbenchToolbar } from "./WorkbenchToolbar";
+import { SectorResearch } from "@/components/sector/SectorResearch";
+import { ResearchQueue } from "@/components/queue/ResearchQueue";
+import type { WorkbenchMode } from "./types";
+import { WorkbenchModeSwitch } from "./WorkbenchModeSwitch";
+import { GlobalMarketTicker } from "./GlobalMarketTicker";
+import { ResearchWorkbench } from "./ResearchWorkbench";
+import { ResearchResultsLibrary } from "./ResearchResultsLibrary";
+import type { ResearchQueueItem } from "@/lib/repositories/researchQueue";
+
+const IndustryAtlas = dynamic(() => import("@/components/atlas/IndustryAtlas").then((module) => module.IndustryAtlas), {
+  ssr: false,
+  loading: () => <div className="atlas-loading" role="status">正在构建产业链星图</div>,
+});
 
 export function Workbench() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [sectorCategoryId, setSectorCategoryId] = useState<number | null>(null);
   const [selectedStockCode, setSelectedStockCode] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [mode, setMode] = useState<WorkbenchMode>("research");
+  const [researchHomeKey, setResearchHomeKey] = useState(0);
+  const [pendingCompanySelection, setPendingCompanySelection] = useState<{ stockCode: string; categoryId: number | null } | null>(null);
+  const [researchFocusTask, setResearchFocusTask] = useState<ResearchQueueItem | null>(null);
 
   useEffect(() => {
     setSelectedStockCode(null);
   }, [selectedCategoryId]);
 
+  useEffect(() => {
+    if (!pendingCompanySelection || selectedCategoryId !== pendingCompanySelection.categoryId) return;
+    setSelectedStockCode(pendingCompanySelection.stockCode);
+    setPendingCompanySelection(null);
+  }, [pendingCompanySelection, selectedCategoryId]);
+
+  useEffect(() => {
+    const storedMode = window.localStorage.getItem("stock-classification:mode");
+    if (storedMode === "queue") {
+      setMode("queue");
+    }
+  }, []);
+
+  const changeMode = (nextMode: WorkbenchMode) => {
+    setMode(nextMode);
+    window.localStorage.setItem("stock-classification:mode", nextMode);
+  };
+
+  const openCompanyFromContext = (stockCode: string, categoryId: number | null) => {
+    setResearchFocusTask(null);
+    setSelectedStockCode(null);
+    setPendingCompanySelection({ stockCode, categoryId });
+    setSelectedCategoryId(categoryId);
+    changeMode("research");
+  };
+
+  const openTaskTarget = (item: ResearchQueueItem) => {
+    if (!item.stockCode) {
+      setSelectedCategoryId(item.categoryId);
+      changeMode("atlas");
+      return;
+    }
+    setResearchFocusTask(item);
+    setSelectedStockCode(null);
+    setPendingCompanySelection({ stockCode: item.stockCode, categoryId: item.categoryId });
+    setSelectedCategoryId(item.categoryId);
+    changeMode("research");
+  };
+
   const refresh = () => setRefreshKey((value) => value + 1);
 
   return (
-    <main className="min-h-screen bg-[#f4f6f9] p-5 text-ink">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-normal">A 股产业链分类工作台</h1>
-          <p className="mt-1 text-sm text-muted">按产业链细分方向快速找到 A 股标的，并沉淀证据和研究备注。</p>
-        </div>
-        <div className="rounded border border-line bg-white px-3 py-2 text-xs text-muted">本地 SQLite · 半导体样板库</div>
-      </div>
-
-      <div className="grid min-h-[720px] grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(520px,1fr)_420px]">
-        <aside className="min-h-[560px] rounded-lg border border-line bg-white p-4">
-          <ClassificationTree
-            selectedCategoryId={selectedCategoryId}
-            onSelect={setSelectedCategoryId}
-            onClearSelection={() => setSelectedCategoryId(null)}
-            onChanged={refresh}
-            refreshKey={refreshKey}
+    <main className={`app-shell is-terminal-mode flex h-screen overflow-hidden ${mode === "atlas" ? "is-atlas-mode" : ""} ${mode === "results" ? "is-results-mode" : ""}`}>
+      <div className="flex min-h-0 w-full flex-col">
+        <div className="terminal-workspace-header">
+          <div className="workspace-brand">
+            <span className="workspace-brand-mark" aria-hidden="true">A</span>
+            <div>
+              <h1>A 股产业链分类工作台</h1>
+              <p>产业关系、公司研究与证据核验的一体化工作空间</p>
+            </div>
+          </div>
+          <WorkbenchModeSwitch
+            value={mode}
+            onChange={(nextMode) => {
+              if (nextMode === "research") {
+                setSelectedStockCode(null);
+                setPendingCompanySelection(null);
+                setResearchHomeKey((value) => value + 1);
+              }
+              changeMode(nextMode);
+            }}
+            onOpenQueue={() => changeMode("queue")}
           />
-        </aside>
+          <button type="button" className="workspace-profile" title="账户与偏好设置">
+            <span>N</span><ChevronDown aria-hidden="true" />
+          </button>
+        </div>
+        <GlobalMarketTicker />
 
-        <section className="flex min-w-0 flex-col gap-3">
-          <WorkbenchToolbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-          <StockTable
+        {mode === "research" ? (
+          <ResearchWorkbench
             selectedCategoryId={selectedCategoryId}
             selectedStockCode={selectedStockCode}
-            searchQuery={searchQuery}
+            refreshKey={refreshKey}
+            homeKey={researchHomeKey}
+            focusTask={researchFocusTask}
+            onSelectCompany={openCompanyFromContext}
+            onOpenAtlas={() => changeMode("atlas")}
+            onOpenSector={(categoryId) => {
+              setSectorCategoryId(categoryId);
+              changeMode("sector");
+            }}
+            onChanged={refresh}
+          />
+        ) : mode === "results" ? (
+          <ResearchResultsLibrary
+            refreshKey={refreshKey}
+            onOpenCompany={openCompanyFromContext}
+            onOpenAtlas={(categoryId) => {
+              setSelectedCategoryId(categoryId);
+              changeMode("atlas");
+            }}
+            onCreate={() => {
+              setSelectedStockCode(null);
+              setPendingCompanySelection(null);
+              setResearchHomeKey((value) => value + 1);
+              changeMode("research");
+            }}
+          />
+        ) : mode === "sector" ? (
+          <SectorResearch
+            selectedCategoryId={sectorCategoryId}
+            refreshKey={refreshKey}
+            onSelectCategory={setSectorCategoryId}
+            onOpenCompany={(stockCode) => {
+              openCompanyFromContext(stockCode, sectorCategoryId);
+            }}
+            onOpenAtlas={() => {
+              setSelectedCategoryId(sectorCategoryId);
+              changeMode("atlas");
+            }}
+            onOpenWorkbench={() => changeMode("research")}
+          />
+        ) : mode === "queue" ? (
+          <ResearchQueue
+            refreshKey={refreshKey}
+            onOpenCompany={openCompanyFromContext}
+            onOpenTarget={openTaskTarget}
+          />
+        ) : (
+          <IndustryAtlas
+            selectedCategoryId={selectedCategoryId}
+            selectedStockCode={selectedStockCode}
+            refreshKey={refreshKey}
+            onGraphChanged={refresh}
+            onSelectCategory={setSelectedCategoryId}
             onSelectStock={setSelectedStockCode}
             onClearStock={() => setSelectedStockCode(null)}
-            onChanged={refresh}
-            refreshKey={refreshKey}
+            onClearSelection={() => {
+              setSelectedCategoryId(null);
+              setSelectedStockCode(null);
+            }}
+            onOpenResearch={(stockCode) => {
+              setSelectedStockCode(stockCode);
+              changeMode("research");
+            }}
+            onOpenSectorResearch={(categoryId) => {
+              setSelectedCategoryId(categoryId);
+              setSectorCategoryId(categoryId);
+              changeMode("sector");
+            }}
           />
-        </section>
-
-        <aside className="min-h-[560px] rounded-lg border border-line bg-white p-4">
-          <CompanyDetails stockCode={selectedStockCode} onChanged={refresh} refreshKey={refreshKey} />
-        </aside>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(520px,1fr)_420px]">
-        <ImportDialog onImported={refresh} />
-        <QualityPanel refreshKey={refreshKey} />
+        )}
       </div>
     </main>
   );

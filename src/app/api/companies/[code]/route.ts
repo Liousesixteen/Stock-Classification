@@ -1,65 +1,53 @@
-import type Database from "better-sqlite3";
 import type { NextRequest } from "next/server";
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/db/client";
 import { companyProfileInputSchema, stockCodeSchema } from "@/lib/domain/schemas";
+import { buildCompanyDossierModel } from "@/lib/research/companyDossierModel";
+import { runSyncTaskWithRetries } from "@/lib/research/syncTaskWorker";
 import { getCompany, updateCompanyProfile } from "@/lib/repositories/companies";
-import { listEvidenceForRelation } from "@/lib/repositories/evidence";
-import { listRelationsForCompany } from "@/lib/repositories/relations";
+import { listCompanyNotes } from "@/lib/repositories/notes";
+import { listCompanyGraphEntityRelations } from "@/lib/repositories/graphEntities";
+import { getLatestResearchRun } from "@/lib/repositories/aiResearch";
+import { getLatestSyncTaskForStock, listSyncTasksForStock } from "@/lib/repositories/syncTasks";
+import { withApiObservability } from "@/lib/operations/observability";
 
 type RouteContext = {
   params: Promise<{ code: string }>;
 };
 
-function listNotesForCompany(db: Database.Database, stockCode: string) {
-  return db
-    .prepare(
-      `
-        select
-          id,
-          target_type as targetType,
-          target_id as targetId,
-          note_type as noteType,
-          content,
-          tags,
-          created_at as createdAt,
-          updated_at as updatedAt
-        from research_notes
-        where target_type = 'company' and target_id = ?
-        order by created_at desc, id desc
-      `,
-    )
-    .all(stockCode);
-}
-
 export async function GET(_request: Request, context: RouteContext) {
   const { code } = await context.params;
   const db = getDatabase();
-  const company = getCompany(db, code);
+  const dossier = buildCompanyDossierModel(db, code);
 
-  if (!company) {
+  if (!dossier) {
     return NextResponse.json({ error: "公司不存在" }, { status: 404 });
   }
 
-  const relations = listRelationsForCompany(db, code);
-  const evidenceByRelationId = Object.fromEntries(relations.map((relation) => [relation.id, listEvidenceForRelation(db, relation.id)]));
+  const latestSyncTask = getLatestSyncTaskForStock(db, code, "company_research_profile");
+  if (latestSyncTask && (latestSyncTask.status === "pending" || latestSyncTask.status === "running")) {
+    after(() => runSyncTaskWithRetries(latestSyncTask.id).then(() => undefined).catch(() => undefined));
+  }
 
   return NextResponse.json({
-    company,
-    relations,
-    evidenceByRelationId,
-    notes: listNotesForCompany(db, code),
+    ...dossier,
+    latestSyncTask,
+    syncTasks: listSyncTasksForStock(db, code).slice(0, 8),
+    notes: listCompanyNotes(db, code),
+    graphEntityRelations: listCompanyGraphEntityRelations(db, code),
+    latestResearchRun: getLatestResearchRun(db, code),
   });
 }
 
-export async function PATCH(request: NextRequest, context: RouteContext) {
+async function patchCompany(request: NextRequest, context: RouteContext) {
   const { code } = await context.params;
   const parsedCode = stockCodeSchema.safeParse(code);
   if (!parsedCode.success) {
     return NextResponse.json({ error: parsedCode.error.issues[0]?.message ?? "股票代码无效" }, { status: 400 });
   }
 
-  const parsed = companyProfileInputSchema.safeParse(await request.json());
+  const parsed = companyProfileInputSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "公司资料无效" }, { status: 400 });
   }
@@ -84,3 +72,5 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "保存公司资料失败" }, { status: 400 });
   }
 }
+
+export const PATCH = withApiObservability("company.profile.update", patchCompany, { audit: true });

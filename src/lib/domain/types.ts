@@ -1,9 +1,20 @@
-import type { CONFIDENCE_LEVELS, NOTE_TYPES, RELATION_TYPES, SOURCE_TYPES } from "./constants";
+import type {
+  CONFIDENCE_LEVELS,
+  GRAPH_ENTITY_RELATION_TYPES,
+  GRAPH_ENTITY_TYPES,
+  GRAPH_RELATION_DIRECTIONS,
+  NOTE_TYPES,
+  RELATION_TYPES,
+  SOURCE_TYPES,
+} from "./constants";
 
 export type RelationType = (typeof RELATION_TYPES)[number];
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
 export type SourceType = (typeof SOURCE_TYPES)[number];
 export type NoteType = (typeof NOTE_TYPES)[number];
+export type GraphEntityType = (typeof GRAPH_ENTITY_TYPES)[number];
+export type GraphEntityRelationType = (typeof GRAPH_ENTITY_RELATION_TYPES)[number];
+export type GraphRelationDirection = (typeof GRAPH_RELATION_DIRECTIONS)[number];
 
 export type CategoryNode = {
   id: number;
@@ -38,6 +49,11 @@ export type CompanyRelation = {
   relationType: RelationType;
   confidence: ConfidenceLevel;
   rationale: string;
+  direction: GraphRelationDirection;
+  strength: number;
+  observedAt: string;
+  verificationStatus?: "unverified" | "verified";
+  verifiedAt?: string;
   primaryEvidenceId: number | null;
   isWatchlist: boolean;
   createdAt: string;
@@ -54,6 +70,8 @@ export type Evidence = {
   excerpt: string;
   credibility: ConfidenceLevel;
   isExpired: boolean;
+  verificationStatus?: "unverified" | "verified";
+  verifiedAt?: string;
 };
 
 export type ResearchNote = {

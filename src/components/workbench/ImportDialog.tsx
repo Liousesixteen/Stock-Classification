@@ -29,9 +29,10 @@ type ImportPreview = {
 
 type ImportDialogProps = {
   onImported: () => void;
+  variant?: "panel" | "dock";
 };
 
-export function ImportDialog({ onImported }: ImportDialogProps) {
+export function ImportDialog({ onImported, variant = "panel" }: ImportDialogProps) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
@@ -68,8 +69,8 @@ export function ImportDialog({ onImported }: ImportDialogProps) {
     onImported();
   }
 
-  return (
-    <section className="rounded-lg border border-line bg-white p-4">
+  const body = (
+    <>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase text-muted">数据导入</div>
@@ -121,6 +122,26 @@ export function ImportDialog({ onImported }: ImportDialogProps) {
       ) : (
         <p className="text-sm text-muted">字段支持股票代码、公司简称、分类路径、关系类型、确信度、来源和研究备注。</p>
       )}
+    </>
+  );
+
+  if (variant === "dock") {
+    return (
+      <details className="group relative">
+        <summary className="action-button flex h-12 cursor-pointer list-none items-center justify-center gap-2 px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <Upload className="h-4 w-4 text-[#1976d2]" />
+          导入
+        </summary>
+        <div className="future-panel absolute right-0 top-14 z-30 w-[min(620px,calc(100vw-2rem))] p-4">
+          {body}
+        </div>
+      </details>
+    );
+  }
+
+  return (
+    <section className="future-panel p-4">
+      {body}
     </section>
   );
 }

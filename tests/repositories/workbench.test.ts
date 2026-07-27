@@ -9,7 +9,7 @@ import {
   getCategoryTree,
   renameCategory,
 } from "@/lib/repositories/categories";
-import { createEvidence, listEvidenceForRelation } from "@/lib/repositories/evidence";
+import { addEvidenceToRelation, createEvidence, listEvidenceForRelation } from "@/lib/repositories/evidence";
 import { getCompany, updateCompanyProfile, upsertCompany } from "@/lib/repositories/companies";
 import {
   deleteRelation,
@@ -141,6 +141,9 @@ describe("workbench repositories", () => {
       confidence: "低",
       rationale: "初始判断",
       isWatchlist: false,
+      direction: "outbound",
+      strength: 82,
+      observedAt: "2026-07-20",
     });
     const secondId = upsertRelation(db, {
       stockCode: "300655",
@@ -161,6 +164,9 @@ describe("workbench repositories", () => {
       confidence: "高",
       rationale: "更新判断",
       isWatchlist: true,
+      direction: "outbound",
+      strength: 82,
+      observedAt: "2026-07-20",
     });
     expect(companyRow).toMatchObject({
       id: firstId,
@@ -284,6 +290,39 @@ describe("workbench repositories", () => {
     expect(relationRow.sourceTitle).toBe("晶瑞电材业务公告");
   });
 
+  it("adds manual evidence to a relation and promotes it as primary evidence", () => {
+    const db = setupDb();
+    const category = findCategoryByPath(db, ["半导体", "材料", "光刻材料", "光刻胶", "ArF 干法/浸没式光刻胶"]);
+    upsertTestCompany(db, "300655", "晶瑞电材");
+    const relationId = upsertRelation(db, {
+      stockCode: "300655",
+      categoryId: category!.id,
+      relationType: "主营业务",
+      confidence: "高",
+      rationale: "光刻胶及配套电子化学品",
+      isWatchlist: false,
+    });
+
+    const evidence = addEvidenceToRelation(db, {
+      relationId,
+      sourceType: "公告",
+      title: "新增公告证据",
+      sourceDate: "2026-07-07",
+      url: "https://example.com/notice",
+      excerpt: "公司公告披露相关产品进展。",
+      credibility: "高",
+      isExpired: false,
+    });
+
+    const [relationRow] = listRelationsForCategory(db, category!.id);
+    expect(evidence).toMatchObject({
+      relationId,
+      title: "新增公告证据",
+      credibility: "高",
+    });
+    expect(relationRow.sourceTitle).toBe("新增公告证据");
+  });
+
   it("creates and renames custom category groups under the selected parent", () => {
     const db = setupDb();
     const material = findCategoryByPath(db, ["半导体", "材料"]);
@@ -302,6 +341,17 @@ describe("workbench repositories", () => {
       parentId: material!.id,
       level: material!.level + 1,
     });
+  });
+
+  it("prevents listed companies from being created or renamed as category groups", () => {
+    const db = setupDb();
+    const material = findCategoryByPath(db, ["半导体", "材料"]);
+    upsertTestCompany(db, "002636", "金安国纪");
+
+    expect(() => createCategory(db, { name: "金安国纪", parentId: material!.id })).toThrow("请使用“添加公司”");
+
+    const customId = createCategory(db, { name: "铜箔", parentId: material!.id });
+    expect(() => renameCategory(db, customId, "金安国纪")).toThrow("请使用“添加公司”");
   });
 
   it("deletes a custom category branch from leaves to parent", () => {

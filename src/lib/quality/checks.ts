@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 
 export type QualityIssue = {
-  type: "缺公司简介" | "缺证据" | "低确信度" | "待验证关系";
+  type: "缺公司简介" | "缺证据" | "低确信度" | "待验证关系" | "缺业务占比" | "缺毛利率" | "缺核心客户";
   severity: "high" | "medium" | "low";
   stockCode?: string;
   relationId?: number;
@@ -70,5 +70,61 @@ export function runQualityChecks(db: Database.Database): QualityIssue[] {
     });
   }
 
+  const structuredProfiles = db
+    .prepare(
+      `
+        select
+          stock_code as stockCode,
+          business_lines as businessLines,
+          key_customers as keyCustomers
+        from company_research_profiles
+      `,
+    )
+    .all() as Array<{ stockCode: string; businessLines: string; keyCustomers: string }>;
+
+  for (const profile of structuredProfiles) {
+    const businessLines = parseJson<Array<{ name?: string; share?: string; grossMargin?: string }>>(profile.businessLines, []);
+    const keyCustomers = parseJson<string[]>(profile.keyCustomers, []);
+
+    if (businessLines.some((line) => isPendingField(line.share, "占比"))) {
+      issues.push({
+        type: "缺业务占比",
+        severity: "medium",
+        stockCode: profile.stockCode,
+        message: `${profile.stockCode} 缺少业务收入占比`,
+      });
+    }
+
+    if (businessLines.some((line) => isPendingField(line.grossMargin, "毛利率"))) {
+      issues.push({
+        type: "缺毛利率",
+        severity: "low",
+        stockCode: profile.stockCode,
+        message: `${profile.stockCode} 缺少业务毛利率`,
+      });
+    }
+
+    if (keyCustomers.length === 0 || keyCustomers.some((customer) => /待补|未知|暂无/.test(customer))) {
+      issues.push({
+        type: "缺核心客户",
+        severity: "medium",
+        stockCode: profile.stockCode,
+        message: `${profile.stockCode} 缺少核心客户信息`,
+      });
+    }
+  }
+
   return issues;
+}
+
+function parseJson<T>(value: string, fallback: T): T {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function isPendingField(value: string | undefined, keyword: string) {
+  return !value || value.trim() === "" || value.includes("待补") || value.includes(keyword.concat("待补"));
 }

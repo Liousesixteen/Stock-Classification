@@ -1,0 +1,23 @@
+services:
+  stock-research:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - ${STOCK_ENV_FILE:-.env.production}
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - stock-research-data:/app/data
+      - stock-research-backups:/app/backups
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  stock-research-data:
+  stock-research-backups:

@@ -17,3 +17,4 @@ data/*.db
 playwright-report/
 test-results/
 coverage/
+backups/

@@ -1,24 +1,38 @@
 {
   "name": "stock-classification",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "postbuild": "node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "lint": "eslint ."
+    "validate:providers": "RUN_LIVE_PROVIDER_TESTS=1 vitest run tests/live/providerAcceptance.live.test.ts",
+    "lint": "eslint .",
+    "security:check": "node scripts/check-secrets.mjs",
+    "db:backup": "node scripts/backup-database.mjs",
+    "db:restore": "node scripts/restore-database.mjs",
+    "ops:check": "node scripts/operations-check.mjs"
   },
   "dependencies": {
+    "@fontsource/noto-sans-sc": "^5.3.0",
+    "@pdf-lib/fontkit": "^1.1.1",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^11.10.0",
+    "docx": "^9.7.1",
     "lucide-react": "^0.468.0",
     "next": "^15.0.0",
+    "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "three": "^0.169.0",
     "xlsx": "^0.18.5",
     "zod": "^3.24.0"
   },
@@ -30,6 +44,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.169.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.0.0",

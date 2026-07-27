@@ -1,7 +1,8 @@
 import type Database from "better-sqlite3";
+import { z } from "zod";
 import { CONFIDENCE_LEVELS, RELATION_TYPES, SOURCE_TYPES } from "@/lib/domain/constants";
 import type { ConfidenceLevel, RelationType, SourceType } from "@/lib/domain/types";
-import { stockCodeSchema } from "@/lib/domain/schemas";
+import { sourceUrlSchema, stockCodeSchema } from "@/lib/domain/schemas";
 import { findCategoryByPath } from "@/lib/repositories/categories";
 
 export type RawImportRow = Record<string, unknown>;
@@ -22,6 +23,27 @@ export type ValidImportRow = {
   intro: string;
   note: string;
 };
+
+export const validImportRowSchema = z.object({
+  stockCode: stockCodeSchema,
+  shortName: z.string().trim().min(1).max(80),
+  categoryId: z.number().int().positive(),
+  categoryPath: z.array(z.string().trim().min(1).max(80)).min(1).max(20),
+  relationType: z.enum(RELATION_TYPES),
+  confidence: z.enum(CONFIDENCE_LEVELS),
+  rationale: z.string().trim().max(2_000),
+  sourceType: z.enum(SOURCE_TYPES),
+  sourceTitle: z.string().trim().max(500),
+  sourceUrl: sourceUrlSchema,
+  sourceDate: z.string().trim().max(40),
+  sourceExcerpt: z.string().trim().max(5_000),
+  intro: z.string().trim().max(5_000),
+  note: z.string().trim().max(5_000),
+});
+
+export const importCommitSchema = z.object({
+  rows: z.array(validImportRowSchema).max(5_000, "单次最多提交 5000 行"),
+});
 
 export type ImportPreview = {
   validRows: ValidImportRow[];

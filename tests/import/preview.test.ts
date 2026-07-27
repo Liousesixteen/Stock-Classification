@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { migrate } from "@/lib/db/schema";
 import { seedSemiconductorData } from "@/lib/db/seed";
 import { commitImportRows } from "@/lib/import/commit";
-import { previewImportRows } from "@/lib/import/preview";
+import { importCommitSchema, previewImportRows } from "@/lib/import/preview";
 import { getCompany } from "@/lib/repositories/companies";
 import { listRelationsForCategory } from "@/lib/repositories/relations";
 
@@ -115,5 +115,27 @@ describe("import preview", () => {
     expect(company?.board).toBe("创业板");
     expect(company?.industry).toBe("电子材料");
     expect(company?.intro).toBe(beforeCompany?.intro);
+  });
+
+  it("rejects tampered commit rows that bypass the preview contract", () => {
+    const parsed = importCommitSchema.safeParse({
+      rows: [{
+        stockCode: "not-a-stock",
+        shortName: "篡改数据",
+        categoryId: -1,
+        categoryPath: [],
+        relationType: "任意关系",
+        confidence: "超高",
+        rationale: "",
+        sourceType: "未知来源",
+        sourceTitle: "",
+        sourceUrl: "",
+        sourceDate: "",
+        sourceExcerpt: "",
+        intro: "",
+        note: "",
+      }],
+    });
+    expect(parsed.success).toBe(false);
   });
 });

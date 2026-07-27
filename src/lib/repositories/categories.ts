@@ -57,6 +57,23 @@ function assertCategoryName(name: string) {
   return trimmedName;
 }
 
+function assertNameIsNotListedCompany(db: Database.Database, name: string) {
+  const company = db
+    .prepare(
+      `
+        select stock_code as stockCode, short_name as shortName
+        from companies
+        where short_name = ? or full_name = ?
+        limit 1
+      `,
+    )
+    .get(name, name) as { stockCode: string; shortName: string } | undefined;
+
+  if (company) {
+    throw new Error(`检测到“${company.shortName}”（${company.stockCode}）为上市公司，请使用“添加公司”关联到当前分类`);
+  }
+}
+
 function siblingNameExists(db: Database.Database, name: string, parentId: number | null, excludedId?: number) {
   const excludedClause = excludedId ? "and id != @excludedId" : "";
   const row =
@@ -144,6 +161,7 @@ export function createCategory(
   },
 ) {
   const name = assertCategoryName(input.name);
+  assertNameIsNotListedCompany(db, name);
   const parentId = input.parentId ?? null;
   const parent = parentId === null ? undefined : getCategoryRowById(db, parentId);
 
@@ -181,6 +199,7 @@ export function renameCategory(db: Database.Database, categoryId: number, name: 
   }
 
   const trimmedName = assertCategoryName(name);
+  assertNameIsNotListedCompany(db, trimmedName);
   if (siblingNameExists(db, trimmedName, existing.parent_id, categoryId)) {
     throw new Error("同级分类已存在");
   }

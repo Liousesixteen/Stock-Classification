@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ConfidenceLevel, RelationType, SourceType } from "@/lib/domain/types";
+import type { ConfidenceLevel, GraphRelationDirection, RelationType, SourceType } from "@/lib/domain/types";
 
 export type RelationInput = {
   stockCode: string;
@@ -8,6 +8,9 @@ export type RelationInput = {
   confidence: ConfidenceLevel;
   rationale: string;
   isWatchlist: boolean;
+  direction?: GraphRelationDirection;
+  strength?: number;
+  observedAt?: string;
 };
 
 type RelationIdRow = {
@@ -23,12 +26,26 @@ type CategoryRelationRow = {
   relationType: RelationType;
   confidence: ConfidenceLevel;
   rationale: string;
+  direction: GraphRelationDirection;
+  strength: number;
+  observedAt: string;
+  verificationStatus: "unverified" | "verified";
+  verifiedAt: string;
   isWatchlist: number;
   sourceType: SourceType | null;
   sourceTitle: string | null;
 };
 
 export function upsertRelation(db: Database.Database, relation: RelationInput) {
+  const relationWithMetadata = {
+    ...relation,
+    direction: relation.direction ?? "undirected",
+    strength: normalizeStrength(relation.strength, relation.confidence),
+    observedAt: relation.observedAt?.trim() ?? "",
+    directionProvided: relation.direction === undefined ? 0 : 1,
+    strengthProvided: relation.strength === undefined ? 0 : 1,
+    observedAtProvided: relation.observedAt?.trim() ? 1 : 0,
+  };
   db.prepare(
     `
       insert into company_category_relations (
@@ -37,6 +54,9 @@ export function upsertRelation(db: Database.Database, relation: RelationInput) {
         relation_type,
         confidence,
         rationale,
+        direction,
+        strength,
+        observed_at,
         is_watchlist
       )
       values (
@@ -45,16 +65,22 @@ export function upsertRelation(db: Database.Database, relation: RelationInput) {
         @relationType,
         @confidence,
         @rationale,
+        @direction,
+        @strength,
+        @observedAt,
         @isWatchlist
       )
       on conflict(stock_code, category_id) do update set
         relation_type = excluded.relation_type,
         confidence = excluded.confidence,
         rationale = excluded.rationale,
+        direction = case when @directionProvided = 1 then excluded.direction else company_category_relations.direction end,
+        strength = case when @strengthProvided = 1 then excluded.strength else company_category_relations.strength end,
+        observed_at = case when @observedAtProvided = 1 then excluded.observed_at else company_category_relations.observed_at end,
         is_watchlist = excluded.is_watchlist,
         updated_at = current_timestamp
     `,
-  ).run({ ...relation, isWatchlist: relation.isWatchlist ? 1 : 0 });
+  ).run({ ...relationWithMetadata, isWatchlist: relation.isWatchlist ? 1 : 0 });
 
   const row = db
     .prepare(
@@ -71,6 +97,19 @@ export function upsertRelation(db: Database.Database, relation: RelationInput) {
 
 export function deleteRelation(db: Database.Database, relationId: number) {
   const result = db.prepare("delete from company_category_relations where id = ?").run(relationId);
+  return result.changes;
+}
+
+export function setRelationWatchlist(db: Database.Database, relationId: number, isWatchlist: boolean) {
+  const result = db
+    .prepare(
+      `
+        update company_category_relations
+        set is_watchlist = ?, updated_at = current_timestamp
+        where id = ?
+      `,
+    )
+    .run(isWatchlist ? 1 : 0, relationId);
   return result.changes;
 }
 
@@ -98,6 +137,11 @@ export function listRelationsForCategory(db: Database.Database, categoryId: numb
           r.relation_type as relationType,
           r.confidence,
           r.rationale,
+          r.direction,
+          r.strength,
+          coalesce(nullif(r.observed_at, ''), r.updated_at) as observedAt,
+          r.verification_status as verificationStatus,
+          r.verified_at as verifiedAt,
           r.is_watchlist as isWatchlist,
           e.source_type as sourceType,
           e.title as sourceTitle
@@ -133,6 +177,11 @@ export function listRelationsForCompany(db: Database.Database, stockCode: string
           r.relation_type as relationType,
           r.confidence,
           r.rationale,
+          r.direction,
+          r.strength,
+          coalesce(nullif(r.observed_at, ''), r.updated_at) as observedAt,
+          r.verification_status as verificationStatus,
+          r.verified_at as verifiedAt,
           r.primary_evidence_id as primaryEvidenceId,
           r.is_watchlist as isWatchlist,
           r.created_at as createdAt,
@@ -151,6 +200,11 @@ export function listRelationsForCompany(db: Database.Database, stockCode: string
     relationType: RelationType;
     confidence: ConfidenceLevel;
     rationale: string;
+    direction: GraphRelationDirection;
+    strength: number;
+    observedAt: string;
+    verificationStatus: "unverified" | "verified";
+    verifiedAt: string;
     primaryEvidenceId: number | null;
     isWatchlist: number;
     createdAt: string;
@@ -158,4 +212,9 @@ export function listRelationsForCompany(db: Database.Database, stockCode: string
   }[];
 
   return rows.map((row) => ({ ...row, isWatchlist: row.isWatchlist === 1 }));
+}
+
+function normalizeStrength(value: number | undefined, confidence: ConfidenceLevel) {
+  const fallback = confidence === "高" ? 85 : confidence === "中" ? 65 : 40;
+  return Math.max(0, Math.min(100, Math.round(value ?? fallback)));
 }

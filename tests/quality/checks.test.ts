@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { migrate } from "@/lib/db/schema";
 import { seedSemiconductorData } from "@/lib/db/seed";
 import { runQualityChecks } from "@/lib/quality/checks";
+import { upsertCompany } from "@/lib/repositories/companies";
+import { upsertCompanyResearchProfile } from "@/lib/repositories/researchProfiles";
 
 describe("quality checks", () => {
   it("reports missing company intro and missing evidence", () => {
@@ -37,5 +39,40 @@ describe("quality checks", () => {
 
     expect(checks.some((item) => item.type === "低确信度")).toBe(true);
     expect(checks.some((item) => item.type === "待验证关系")).toBe(true);
+  });
+
+  it("reports incomplete structured research profile fields", () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    seedSemiconductorData(db);
+    upsertCompany(db, {
+      stockCode: "600584",
+      shortName: "长电科技",
+      fullName: "",
+      board: "沪市主板",
+      industry: "半导体",
+      region: "",
+      marketCapBand: "",
+      intro: "简介",
+      mainBusiness: "封测业务",
+      updatedAt: "",
+    });
+    upsertCompanyResearchProfile(db, {
+      stockCode: "600584",
+      summary: "封测业务",
+      businessLines: [{ name: "封装测试", share: "占比待补", grossMargin: "毛利率待补" }],
+      chainPosition: ["封测"],
+      competitiveAdvantages: ["先进封装"],
+      keyCustomers: ["客户待补"],
+      catalysts: [],
+      risks: [],
+      sourceSummary: "自动同步资料",
+    });
+
+    const checks = runQualityChecks(db);
+
+    expect(checks.some((item) => item.type === "缺业务占比" && item.stockCode === "600584")).toBe(true);
+    expect(checks.some((item) => item.type === "缺毛利率" && item.stockCode === "600584")).toBe(true);
+    expect(checks.some((item) => item.type === "缺核心客户" && item.stockCode === "600584")).toBe(true);
   });
 });

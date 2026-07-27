@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Building2, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { CategoryNode } from "@/lib/domain/types";
 
@@ -8,6 +8,7 @@ type ClassificationTreeProps = {
   selectedCategoryId: number | null;
   onSelect: (categoryId: number) => void;
   onClearSelection: () => void;
+  onAddStock?: (categoryId: number) => void;
   onChanged: () => void;
   refreshKey: number;
 };
@@ -149,6 +150,7 @@ function TreeNode({
   expandedIds,
   onToggleExpanded,
   onStartCreate,
+  onAddStock,
   onStartRename,
   onDelete,
   onDraftValueChange,
@@ -162,6 +164,7 @@ function TreeNode({
   expandedIds: Set<number>;
   onToggleExpanded: (categoryId: number) => void;
   onStartCreate: (parentId: number | null) => void;
+  onAddStock?: (categoryId: number) => void;
   onStartRename: (node: CategoryNode) => void;
   onDelete: (node: CategoryNode) => void;
   onDraftValueChange: (value: string) => void;
@@ -219,9 +222,18 @@ function TreeNode({
             >
               {node.name}
             </button>
-            {hasChildren ? <span className="px-1 text-[11px] text-muted">{node.children.length}</span> : null}
+            {hasChildren ? (
+              <span title="子分类数量" className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                {node.children.length} 子类
+              </span>
+            ) : null}
             <div className="flex shrink-0 items-center">
-              <IconButton label={`为 ${node.name} 新增子分组`} onClick={() => onStartCreate(node.id)}>
+              {onAddStock ? (
+                <IconButton label={`向 ${node.name} 添加公司`} onClick={() => onAddStock(node.id)}>
+                  <Building2 className="h-3.5 w-3.5" />
+                </IconButton>
+              ) : null}
+              <IconButton label={`为 ${node.name} 新增子分类`} onClick={() => onStartCreate(node.id)}>
                 <Plus className="h-3.5 w-3.5" />
               </IconButton>
               <IconButton label={`重命名 ${node.name}`} onClick={() => onStartRename(node)}>
@@ -260,6 +272,7 @@ function TreeNode({
               expandedIds={expandedIds}
               onToggleExpanded={onToggleExpanded}
               onStartCreate={onStartCreate}
+              onAddStock={onAddStock}
               onStartRename={onStartRename}
               onDelete={onDelete}
               onDraftValueChange={onDraftValueChange}
@@ -277,6 +290,7 @@ export function ClassificationTree({
   selectedCategoryId,
   onSelect,
   onClearSelection,
+  onAddStock,
   onChanged,
   refreshKey,
 }: ClassificationTreeProps) {
@@ -407,11 +421,11 @@ export function ClassificationTree({
       <div className="mb-3 flex items-center justify-between">
         <div>
           <div className="text-xs font-semibold uppercase text-muted">行业 / 产业链</div>
-          <h2 className="mt-1 text-lg font-semibold">半导体细分树</h2>
+          <h2 className="mt-1 text-lg font-semibold">产业链分类树</h2>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded border border-line px-2 py-1 text-xs text-muted">{nodeCount} 节点</span>
-          <IconButton label="新增顶层分组" onClick={() => handleStartCreate(null)}>
+          <IconButton label="新增顶层分类" onClick={() => handleStartCreate(null)}>
             <Plus className="h-3.5 w-3.5" />
           </IconButton>
         </div>
@@ -441,6 +455,7 @@ export function ClassificationTree({
                 expandedIds={expandedIds}
                 onToggleExpanded={handleToggleExpanded}
                 onStartCreate={handleStartCreate}
+                onAddStock={onAddStock}
                 onStartRename={handleStartRename}
                 onDelete={handleDelete}
                 onDraftValueChange={handleDraftValueChange}

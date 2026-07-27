@@ -3,14 +3,15 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/db/client";
 import { categoryCreateInputSchema } from "@/lib/domain/schemas";
 import { createCategory, getCategoryById, getCategoryTree } from "@/lib/repositories/categories";
+import { withApiObservability } from "@/lib/operations/observability";
 
 export async function GET() {
   const db = getDatabase();
   return NextResponse.json({ categories: getCategoryTree(db) });
 }
 
-export async function POST(request: NextRequest) {
-  const parsed = categoryCreateInputSchema.safeParse(await request.json());
+async function postCategory(request: NextRequest) {
+  const parsed = categoryCreateInputSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "分类参数无效" }, { status: 400 });
   }
@@ -23,3 +24,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "创建分类失败" }, { status: 400 });
   }
 }
+
+export const POST = withApiObservability("category.create", postCategory, { audit: true });
