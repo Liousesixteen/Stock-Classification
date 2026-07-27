@@ -14,7 +14,7 @@ import { getCategoryById } from "@/lib/repositories/categories";
 import { upsertCompanyFieldFact } from "@/lib/repositories/companyFieldFacts";
 import { getCompany, upsertCompany } from "@/lib/repositories/companies";
 import { deleteEvidenceForRelationByTitle } from "@/lib/repositories/evidence";
-import { upsertCompanyResearchProfile } from "@/lib/repositories/researchProfiles";
+import { getCompanyResearchProfile, upsertCompanyResearchProfile } from "@/lib/repositories/researchProfiles";
 import { listRelationsForCompany, upsertRelation } from "@/lib/repositories/relations";
 import { getFreshSourceSnapshot, listSourceSnapshots, upsertSourceSnapshot } from "@/lib/repositories/sourceSnapshots";
 import { updateSyncTask } from "@/lib/repositories/syncTasks";
@@ -249,22 +249,22 @@ function persistSyncResult(
     const primary = validAnalyses[0].result;
     upsertCompany(db, {
       stockCode,
-      shortName: firstText(profile.shortName, existingCompany?.shortName, stockCode),
-      fullName: firstText(primary.companyProfilePatch.fullName, profile.fullName, existingCompany?.fullName),
-      board: firstText(primary.companyProfilePatch.board, profile.board, existingCompany?.board),
-      industry: firstText(primary.companyProfilePatch.industry, profile.industry, existingCompany?.industry),
-      region: firstText(primary.companyProfilePatch.region, profile.region, existingCompany?.region),
+      shortName: firstText(existingCompany?.shortName, profile.shortName, stockCode),
+      fullName: firstText(existingCompany?.fullName, profile.fullName, primary.companyProfilePatch.fullName),
+      board: firstText(existingCompany?.board, profile.board, primary.companyProfilePatch.board),
+      industry: firstText(existingCompany?.industry, profile.industry, primary.companyProfilePatch.industry),
+      region: firstText(existingCompany?.region, profile.region, primary.companyProfilePatch.region),
       marketCapBand: firstText(
-        primary.companyProfilePatch.marketCapBand,
-        profile.marketCapBand,
         existingCompany?.marketCapBand,
+        profile.marketCapBand,
+        primary.companyProfilePatch.marketCapBand,
       ),
-      intro: firstText(primary.companyProfilePatch.intro, profile.intro, existingCompany?.intro),
+      intro: firstText(existingCompany?.intro, profile.intro, primary.companyProfilePatch.intro),
       mainBusiness: firstText(
-        primary.companyProfilePatch.mainBusiness,
+        existingCompany?.mainBusiness,
         profile.mainBusiness,
         profile.businessScope,
-        existingCompany?.mainBusiness,
+        primary.companyProfilePatch.mainBusiness,
       ),
       updatedAt: "",
     });
@@ -285,9 +285,17 @@ function persistSyncResult(
       deleteEvidenceForRelationByTitle(db, relationId, result.evidence.title);
     }
 
+    const existingProfile = getCompanyResearchProfile(db, stockCode);
     upsertCompanyResearchProfile(db, {
       stockCode,
-      ...primary.researchProfilePatch,
+      summary: firstText(existingProfile?.summary, primary.researchProfilePatch.summary),
+      businessLines: existingProfile?.businessLines.length ? existingProfile.businessLines : primary.researchProfilePatch.businessLines,
+      chainPosition: existingProfile?.chainPosition.length ? existingProfile.chainPosition : primary.researchProfilePatch.chainPosition,
+      competitiveAdvantages: existingProfile?.competitiveAdvantages.length ? existingProfile.competitiveAdvantages : primary.researchProfilePatch.competitiveAdvantages,
+      keyCustomers: existingProfile?.keyCustomers.length ? existingProfile.keyCustomers : primary.researchProfilePatch.keyCustomers,
+      catalysts: existingProfile?.catalysts.length ? existingProfile.catalysts : primary.researchProfilePatch.catalysts,
+      risks: existingProfile?.risks.length ? existingProfile.risks : primary.researchProfilePatch.risks,
+      sourceSummary: firstText(existingProfile?.sourceSummary, primary.researchProfilePatch.sourceSummary),
     });
     return validAnalyses.length;
   })();

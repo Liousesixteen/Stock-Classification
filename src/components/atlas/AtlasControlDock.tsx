@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, GripVertical, Share2 } from "lucide-react";
+import { Boxes, Check, GripVertical, Share2 } from "lucide-react";
 import React, { type CSSProperties, useState, type PointerEvent } from "react";
 import type { IndustryGraphNode, IndustryGraphSignalFilter } from "@/lib/industry-graph/types";
 import { AtlasFocusTrail } from "./AtlasFocusTrail";
@@ -35,6 +35,7 @@ export function AtlasControlDock({
 }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const style = { "--atlas-dock-x": `${offset.x}px`, "--atlas-dock-y": `${offset.y}px` } as CSSProperties;
 
   const startDrag = (event: PointerEvent<HTMLButtonElement>) => {
@@ -52,13 +53,23 @@ export function AtlasControlDock({
     });
   };
   const endDrag = () => setDragOrigin(null);
+  const copyAtlasLink = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(window.location.href);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+    window.setTimeout(() => setCopyState("idle"), 1800);
+  };
 
   return (
     <div className={`atlas-control-dock ${dragOrigin ? "is-dragging" : ""}`} style={style}>
       <button className="atlas-dock-handle" type="button" aria-label="拖动聚焦控制台" title="拖动聚焦控制台" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <GripVertical aria-hidden="true" />
       </button>
-      <div className="atlas-control-main"><AtlasNodeFinder nodes={nodes} onSelect={onSelectNode} embedded /><div className="atlas-control-filters"><span><Boxes aria-hidden="true" />{focus ? "局部立体" : "产业链全景"}</span><select aria-label="证据信号筛选" value={signalFilter} onChange={(event) => onSignalFilterChange(event.target.value as IndustryGraphSignalFilter)}><option value="all">全部关系</option><option value="upstream">上游输入</option><option value="downstream">下游输出</option><option value="verified">已证实</option><option value="review">待复核</option><option value="missingEvidence">缺证据</option><option value="watchlist">重点跟踪</option></select><b>{stats.categoryCount} 节点 · {stats.companyCount} 公司 · {stats.evidenceCount} 证据</b><button type="button" aria-label="复制当前图谱链接" title="复制当前图谱链接" onClick={() => navigator.clipboard?.writeText(window.location.href)}><Share2 aria-hidden="true" /></button></div></div>
+      <div className="atlas-control-main"><AtlasNodeFinder nodes={nodes} onSelect={onSelectNode} embedded /><div className="atlas-control-filters"><span><Boxes aria-hidden="true" />{focus ? "局部立体" : "产业链全景"}</span><select aria-label="证据信号筛选" value={signalFilter} onChange={(event) => onSignalFilterChange(event.target.value as IndustryGraphSignalFilter)}><option value="all">全部关系</option><option value="upstream">上游输入</option><option value="downstream">下游输出</option><option value="verified">已证实</option><option value="review">待复核</option><option value="missingEvidence">缺证据</option><option value="watchlist">重点跟踪</option></select><b>{stats.categoryCount} 节点 · {stats.companyCount} 公司 · {stats.evidenceCount} 证据</b><button type="button" className={copyState === "copied" ? "is-copied" : ""} aria-label={copyState === "copied" ? "图谱链接已复制" : copyState === "failed" ? "图谱链接复制失败" : "复制当前图谱链接"} title={copyState === "copied" ? "链接已复制" : copyState === "failed" ? "复制失败，请从地址栏复制" : "复制当前图谱链接"} onClick={copyAtlasLink}>{copyState === "copied" ? <Check aria-hidden="true" /> : <Share2 aria-hidden="true" />}</button><span className="atlas-copy-status" aria-live="polite">{copyState === "copied" ? "已复制" : copyState === "failed" ? "复制失败" : ""}</span></div></div>
       {focus ? <AtlasFocusTrail labels={focus.labels} categoryCount={focus.categoryCount} companyCount={focus.companyCount} onReset={() => onSelectCategory(null)} onBack={() => onSelectCategory(focus.parentId)} onOpenSectorResearch={onOpenSectorResearch ? () => onOpenSectorResearch(focus.categoryId) : undefined} embedded /> : null}
     </div>
   );

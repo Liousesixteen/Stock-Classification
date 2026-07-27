@@ -297,44 +297,38 @@ function normalizeResearchReport(
   let unsupportedClaimCount = 0;
   const usedIds = new Set<string>();
   const acceptedTexts: string[] = [];
-  let markdown: string;
-
-  if (rawSections.length === 0 && textValue(value.markdown, "")) {
-    markdown = textValue(value.markdown, "# 研究报告\n\n资料不足，暂未生成正文。");
-    for (const citation of catalog) {
-      if (markdown.includes(`[${citation.id}]`)) usedIds.add(citation.id);
-    }
-  } else {
-    const sectionBodies = outline.map((sectionTitle, index) => {
-      const rawSection = rawSections.find((section) => textValue(section.title, "") === sectionTitle) ?? rawSections[index] ?? {};
-      const normalized = normalizeReportClaims(rawSection.claims, allowedIds);
-      unsupportedClaimCount += normalized.unsupportedClaimCount;
-      normalized.claims.forEach((claim) => claim.citationIds.forEach((id) => usedIds.add(id)));
-      acceptedTexts.push(...normalized.claims.filter((claim) => claim.citationIds.length > 0).map((claim) => claim.text));
-      const body = normalized.claims.length
-        ? normalized.claims.map((claim) => `${claim.text}${formatClaimCitations(claim.citationIds)}`).join("\n\n")
-        : "待补：当前证据目录不足以支持本节结论。";
-      return `## ${sectionTitle}\n\n${body}`;
-    });
-    executiveSummary = acceptedTexts.length
-      ? acceptedTexts.slice(0, 2).join(" ").slice(0, 180)
-      : "当前没有足够的可引用证据形成报告摘要。";
-    const referencedCitations = catalog.filter((citation) => usedIds.has(citation.id));
-    const appendix = referencedCitations.length
-      ? referencedCitations.map((citation) =>
-        `- [${citation.id}] ${citation.title}${citation.sourceDate ? `（${citation.sourceDate}）` : ""}${citation.url ? ` ${citation.url}` : ""}`,
-      ).join("\n")
-      : "- 待补：尚无通过引用校验的资料。";
-    markdown = [
-      `# ${title}`,
-      `> ${executiveSummary}${formatClaimCitations([...usedIds].slice(0, 3))}`,
-      ...sectionBodies,
-      "## 引用资料",
-      appendix,
-      "## 免责声明",
-      "本报告仅供研究参考，不构成任何投资建议。",
-    ].join("\n\n");
-  }
+  // Never accept a free-form markdown fallback from the model. Only structured
+  // claims pass through citation validation; otherwise an ungrounded paragraph
+  // could bypass the evidence boundary entirely.
+  const sectionBodies = outline.map((sectionTitle, index) => {
+    const rawSection = rawSections.find((section) => textValue(section.title, "") === sectionTitle) ?? rawSections[index] ?? {};
+    const normalized = normalizeReportClaims(rawSection.claims, allowedIds);
+    unsupportedClaimCount += normalized.unsupportedClaimCount;
+    normalized.claims.forEach((claim) => claim.citationIds.forEach((id) => usedIds.add(id)));
+    acceptedTexts.push(...normalized.claims.filter((claim) => claim.citationIds.length > 0).map((claim) => claim.text));
+    const body = normalized.claims.length
+      ? normalized.claims.map((claim) => `${claim.text}${formatClaimCitations(claim.citationIds)}`).join("\n\n")
+      : "待补：当前证据目录不足以支持本节结论。";
+    return `## ${sectionTitle}\n\n${body}`;
+  });
+  executiveSummary = acceptedTexts.length
+    ? acceptedTexts.slice(0, 2).join(" ").slice(0, 180)
+    : "当前没有足够的可引用证据形成报告摘要。";
+  const referencedCitations = catalog.filter((citation) => usedIds.has(citation.id));
+  const appendix = referencedCitations.length
+    ? referencedCitations.map((citation) =>
+      `- [${citation.id}] ${citation.title}${citation.sourceDate ? `（${citation.sourceDate}）` : ""}${citation.url ? ` ${citation.url}` : ""}`,
+    ).join("\n")
+    : "- 待补：尚无通过引用校验的资料。";
+  const markdown = [
+    `# ${title}`,
+    `> ${executiveSummary}${formatClaimCitations([...usedIds].slice(0, 3))}`,
+    ...sectionBodies,
+    "## 引用资料",
+    appendix,
+    "## 免责声明",
+    "本报告仅供研究参考，不构成任何投资建议。",
+  ].join("\n\n");
 
   const citations = catalog.filter((citation) => usedIds.has(citation.id));
   const quality = evaluateResearchReport(markdown, citations, reportType, unsupportedClaimCount, outline);

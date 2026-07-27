@@ -47,6 +47,7 @@ type ResearchIntelligenceDockProps = {
   stockCode: string | null;
   companyName: string;
   categoryId: number | null;
+  categoryName?: string;
   tab: IntelligenceTab;
   onTabChange: (tab: IntelligenceTab) => void;
   onClose: () => void;
@@ -70,6 +71,8 @@ type LookupPayload = {
     shortName: string;
     board: string;
     industry: string;
+    categoryId?: number | null;
+    categoryName?: string;
   };
   error?: string;
 };
@@ -85,7 +88,7 @@ type CategoryLookupNode = {
 const ROLE_PREVIEW = ["基本面 Agent", "产业链 Agent", "情报 Agent", "风险 Agent", "主审 Agent"];
 type ResearchRun = StoredResearchRun | StoredUniversalResearchRun;
 
-export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, tab, onTabChange, onClose, embedded = false, onTargetChange }: ResearchIntelligenceDockProps) {
+export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, categoryName = "", tab, onTabChange, onClose, embedded = false, onTargetChange }: ResearchIntelligenceDockProps) {
   const [targetQuery, setTargetQuery] = useState(companyName || stockCode || "");
   const [target, setTarget] = useState<IntelligenceTarget | null>(stockCode ? {
     targetType: "company",
@@ -93,7 +96,7 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
     stockCode,
     companyName: companyName || stockCode,
     board: "",
-    industry: "",
+    industry: categoryName,
     categoryId,
   } : null);
   const [resolvingTarget, setResolvingTarget] = useState(false);
@@ -120,14 +123,14 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
       stockCode,
       companyName: companyName || stockCode,
       board: "",
-      industry: "",
+      industry: categoryName,
       categoryId,
     };
     setTarget(nextTarget);
     setTargetQuery(companyName || stockCode);
     setReportType("company");
     onTargetChange?.(nextTarget);
-  }, [categoryId, companyName, onTargetChange, stockCode]);
+  }, [categoryId, categoryName, companyName, onTargetChange, stockCode]);
 
   useEffect(() => {
     setRun(null);
@@ -181,8 +184,8 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
         stockCode: payload.profile.stockCode,
         companyName: payload.profile.shortName || payload.profile.stockCode,
         board: payload.profile.board,
-        industry: payload.profile.industry,
-        categoryId: payload.profile.stockCode === stockCode ? categoryId : null,
+        industry: payload.profile.categoryName || payload.profile.industry,
+        categoryId: payload.profile.categoryId ?? (payload.profile.stockCode === stockCode ? categoryId : null),
       };
       setTarget(nextTarget);
       setTargetQuery(nextTarget.companyName);
@@ -625,6 +628,7 @@ function AiResearchWorkspace({
           <footer><div><button type="button" onClick={() => setDialog("context")}><AtSign />引用</button><button type="button" onClick={() => setDialog("context")}><Paperclip />附件</button><button type="button" disabled title="结构化指标将在数据源启用后开放"><BarChart3 />指标</button><button type="button" disabled title="先完成研究后在报告工坊生成图表"><Table2 />图表</button><button type="button" disabled title="联网数据需先进入 Provider"><Globe2 />数据源</button></div><span>证据约束研究引擎</span><button type="button" className="ai-composer-send" aria-label={running ? "研究运行中" : "开始研究"} onClick={onLaunchResearch} disabled={running || !question.trim()}>{running ? <LoaderCircle className="animate-spin" /> : <Send />}</button></footer>
         </section>
         <small className="ai-disclaimer">内容由 AI 生成，仅供参考，请结合专业判断。免责声明</small>
+        <button type="button" className="ai-mobile-to-report" onClick={onOpenReport}><FileText />转入报告工坊 <ChevronRight /></button>
       </section>
 
       <aside className={`ai-evidence-rail ${evidenceCollapsed ? "is-collapsed" : ""}`}>

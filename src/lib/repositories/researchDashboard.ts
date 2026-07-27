@@ -23,6 +23,7 @@ export type ResearchDashboard = {
     activeCategories: number;
     researchProfiles: number;
     effectiveEvidence: number;
+    artifacts: number;
     reports: number;
     aiRuns: number;
     openTasks: number;
@@ -35,6 +36,7 @@ export type ResearchDashboard = {
 type CountRow = { count: number };
 
 export function getResearchDashboard(db: Database.Database): ResearchDashboard {
+  const results = listResearchResults(db);
   const stats = {
     catalogCompanies: count(db, "select count(*) as count from companies"),
     activeCompanies: count(db, `
@@ -49,6 +51,7 @@ export function getResearchDashboard(db: Database.Database): ResearchDashboard {
     `),
     researchProfiles: count(db, "select count(*) as count from company_research_profiles"),
     effectiveEvidence: count(db, `select count(*) as count from evidences evidence where ${effectiveEvidenceSql("evidence")}`),
+    artifacts: results.artifacts.filter((artifact) => !artifact.archived).length,
     reports: count(db, `
       select (
         (select count(*) from research_documents)
@@ -70,7 +73,7 @@ export function getResearchDashboard(db: Database.Database): ResearchDashboard {
     mode,
     stats,
     companies: listDashboardCompanies(db, mode === "starter"),
-    recentArtifacts: listResearchResults(db).artifacts
+    recentArtifacts: results.artifacts
       .filter((artifact) => !artifact.archived && (artifact.kind === "report" || artifact.kind === "ai"))
       .slice(0, 6),
   };

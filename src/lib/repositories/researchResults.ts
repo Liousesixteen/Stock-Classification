@@ -277,7 +277,7 @@ function listReports(db: Database.Database): ResearchArtifact[] {
 
 function listResearchRuns(db: Database.Database): ResearchArtifact[] {
   const rows = db.prepare(
-    `select run.id, run.stock_code as stockCode, run.category_id as categoryId,
+    `select run.id, run.stock_code as stockCode, run_relation.category_id as categoryId,
             run.question, run.depth, run.model, run.result_json as resultJson,
             run.updated_at as updatedAt, company.short_name as shortName,
             category.name as categoryName,
@@ -287,7 +287,10 @@ function listResearchRuns(db: Database.Database): ResearchArtifact[] {
                and (${effectiveEvidenceSql("evidence")})) as evidenceCount
      from ai_research_runs run
      join companies company on company.stock_code = run.stock_code
-     left join categories category on category.id = run.category_id
+     left join company_category_relations run_relation
+       on run_relation.stock_code = run.stock_code
+      and run_relation.category_id = run.category_id
+     left join categories category on category.id = run_relation.category_id
      where run.status = 'completed'
      order by run.id desc`,
   ).all() as RunRow[];

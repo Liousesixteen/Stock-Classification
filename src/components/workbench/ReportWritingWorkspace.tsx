@@ -163,6 +163,30 @@ export function ReportWritingWorkspace({
       </aside>
 
       <section className="report-studio-editor" aria-label="报告编辑区">
+        <div className="report-mobile-controls" aria-label="移动端报告操作">
+          <label>
+            <span>章节</span>
+            <select value={activeSection} onChange={(event) => setActiveSection(Number(event.target.value))}>
+              {outline.map((section, index) => <option key={section} value={index}>{String(index + 1).padStart(2, "0")} {section}</option>)}
+            </select>
+          </label>
+          <div>
+            <button type="button" onClick={() => dirty && onSave(draftMarkdown)} disabled={!dirty || saving} aria-label="保存报告版本">{saving ? <LoaderCircle className="animate-spin" /> : <Save />}保存</button>
+            <button type="button" onClick={() => onRewrite(sectionTitle, rewriteInstruction)} disabled={!report || rewriting} aria-label={`AI 改写${sectionTitle}`}>{rewriting ? <LoaderCircle className="animate-spin" /> : <Sparkles />}改写</button>
+            <button type="button" className={showHistory ? "is-active" : ""} onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory}><History />版本</button>
+          </div>
+          <div className="report-mobile-exports" aria-label="导出报告">
+            <button type="button" aria-label="移动端导出 Markdown 报告" disabled={!report} onClick={() => onExport("markdown")}><Download />Markdown</button>
+            <button type="button" aria-label="移动端导出 Word 报告" disabled={!report} onClick={() => onExport("docx")}><FileOutput />Word</button>
+            <button type="button" aria-label="移动端导出 PDF 报告" disabled={!report} onClick={() => onExport("pdf")}><FileText />PDF</button>
+          </div>
+        </div>
+
+        {showHistory ? <div className="report-mobile-history" aria-label="移动端版本历史">
+          <header><b>版本历史</b><span>{versions.length} 个可追溯版本</span></header>
+          <div className="report-version-list">{versions.map((version) => <button type="button" key={version.id} className={version.versionNumber === report?.currentVersion ? "is-current" : ""} onClick={() => version.versionNumber !== report?.currentVersion && onRestore(version.versionNumber)}><i>V{version.versionNumber}</i><span><b>{version.changeSummary}</b><small>{versionSourceLabel(version.source)} · {formatReportDate(version.createdAt)}</small></span>{version.versionNumber === report?.currentVersion ? <CheckCircle2 /> : <RefreshCw />}</button>)}{versions.length === 0 ? <p>生成报告后自动建立版本记录。</p> : null}</div>
+        </div> : null}
+
         <div className="report-rich-toolbar" role="toolbar" aria-label="Markdown 格式工具">
           <button type="button" onClick={() => wrapSelection("**")} title="加粗"><b>B</b></button>
           <button type="button" onClick={() => wrapSelection("*")} title="斜体"><i>I</i></button>
@@ -211,9 +235,9 @@ export function ReportWritingWorkspace({
         <section className="report-export-panel">
           <h4>导出与成果沉淀</h4>
           <div>
-            <button type="button" disabled={!report} onClick={() => onExport("markdown")}><Download />Markdown</button>
-            <button type="button" disabled={!report} onClick={() => onExport("docx")}><FileOutput />Word</button>
-            <button type="button" disabled={!report} onClick={() => onExport("pdf")}><FileText />PDF</button>
+            <button type="button" aria-label="导出 Markdown 报告" disabled={!report} onClick={() => onExport("markdown")}><Download />Markdown</button>
+            <button type="button" aria-label="导出 Word 报告" disabled={!report} onClick={() => onExport("docx")}><FileOutput />Word</button>
+            <button type="button" aria-label="导出 PDF 报告" disabled={!report} onClick={() => onExport("pdf")}><FileText />PDF</button>
           </div>
           <button type="button" className="report-publish" disabled={!report}><Send />{report ? "已自动进入成果库" : "等待报告生成"}<ChevronRight /></button>
         </section>

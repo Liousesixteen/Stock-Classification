@@ -94,12 +94,12 @@ describe("ReportWritingWorkspace", () => {
     }));
 
     expect(screen.getByDisplayValue("集成电路封装测试")).toBeVisible();
-    const exportButton = screen.getByRole("button", { name: /Markdown/ });
+    const exportButton = screen.getByRole("button", { name: "导出 Markdown 报告" });
     expect(exportButton).toBeEnabled();
     fireEvent.click(exportButton);
     expect(baseProps.onExport).toHaveBeenCalledWith("markdown");
-    expect(screen.getByRole("button", { name: /Word/ })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /PDF/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "导出 Word 报告" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "导出 PDF 报告" })).toBeEnabled();
 
     const editor = screen.getByRole("textbox", { name: "投资摘要章节正文" });
     fireEvent.change(editor, { target: { value: "更新后的投资摘要 [evidence:1]" } });

@@ -1064,7 +1064,7 @@ function ResearchProfileEditor({ draft, error, onChange, onSubmit, onClose }: { 
   </div><EditorActions error={error} label="保存结构化资料" /></form>;
 }
 
-function EditorTitle({ title, onClose }: { title: string; onClose: () => void }) { return <div className="dossier-editor-title"><strong>{title}</strong><button type="button" onClick={onClose}><X /></button></div>; }
+function EditorTitle({ title, onClose }: { title: string; onClose: () => void }) { return <div className="dossier-editor-title"><strong>{title}</strong><button type="button" aria-label={`关闭${title}`} onClick={onClose}><X /></button></div>; }
 function EditorActions({ error, label }: { error: string; label: string }) { return <div className="dossier-editor-actions">{error ? <span>{error}</span> : null}<button type="submit"><Check />{label}</button></div>; }
 function DossierInput({ label, value, onChange, wide = false, multiline = false }: { label: string; value: string; onChange: (value: string) => void; wide?: boolean; multiline?: boolean }) { return <label className={wide ? "is-wide" : ""}><span>{label}</span>{multiline ? <textarea rows={3} value={value} onChange={(event) => onChange(event.target.value)} /> : <input value={value} onChange={(event) => onChange(event.target.value)} />}</label>; }
 function PanelHeading({ title, meta, action }: { title: string; meta?: string; action?: ReactNode }) { return <header className="dossier-panel-heading"><div><h3>{title}</h3>{meta ? <span>{meta}</span> : null}</div>{action}</header>; }
@@ -1634,7 +1634,8 @@ function buildSyncPresentation(
 ) {
   const successfulSources = snapshots.filter((snapshot) => sourceSnapshotTone(snapshot.status) === "success").length;
   const failedSources = snapshots.filter((snapshot) => sourceSnapshotTone(snapshot.status) === "failed").length;
-  const partial = successfulSources > 0 && failedSources > 0;
+  const pendingSources = snapshots.length - successfulSources - failedSources;
+  const partial = successfulSources > 0 && (failedSources > 0 || pendingSources > 0);
 
   if (syncError || task?.status === "failed") {
     return {
@@ -1660,9 +1661,9 @@ function buildSyncPresentation(
     return {
       visible: true,
       tone: task.status === "partial" || partial ? "partial" : "success",
-      label: task.status === "partial" || partial ? "资料部分可用" : "资料已就绪",
+      label: task.status === "partial" || partial ? "基础资料可用" : "资料已就绪",
       message: task.status === "partial" || partial
-        ? `${successfulSources} 个来源已完成，${failedSources} 个来源暂时不可用`
+        ? `${successfulSources} 个来源可用${failedSources ? `，${failedSources} 个来源暂时不可用` : ""}${pendingSources ? `，${pendingSources} 个来源本次未启用` : ""}`
         : task.message || "结构化资料和证据已经更新",
       actionLabel: "重新补全",
       successfulSources,
@@ -1671,8 +1672,8 @@ function buildSyncPresentation(
   return {
     visible: snapshots.length > 0,
     tone: partial ? "partial" : "success",
-    label: partial ? "资料部分可用" : "资料已就绪",
-    message: partial ? `${successfulSources} 个来源已完成，${failedSources} 个来源暂时不可用` : "本地资料已就绪",
+    label: partial ? "基础资料可用" : "资料已就绪",
+    message: partial ? `${successfulSources} 个来源可用${failedSources ? `，${failedSources} 个来源暂时不可用` : ""}${pendingSources ? `，${pendingSources} 个来源本次未启用` : ""}` : "本地资料已就绪",
     actionLabel: "同步资料",
     successfulSources,
   };
@@ -1686,6 +1687,7 @@ function sourceSnapshotTone(status: string) {
 }
 
 function sourceSnapshotLabel(status: string) {
+  if (status.toLowerCase() === "skipped") return "本次跳过";
   const tone = sourceSnapshotTone(status);
   if (tone === "success") return "可用";
   if (tone === "failed") return "暂不可用";

@@ -205,7 +205,7 @@ export function ResearchResultsLibrary({
           <div>
             <label><SlidersHorizontal aria-hidden="true" /><select value={sort} onChange={(event) => setSort(event.target.value as "recent" | "complete")} aria-label="成果排序"><option value="recent">更新时间</option><option value="complete">完整度</option></select></label>
             <div className="results-view-switch"><button type="button" title="卡片视图" className={view === "grid" ? "is-active" : ""} onClick={() => setView("grid")}><Grid2X2 aria-hidden="true" /></button><button type="button" title="列表视图" className={view === "list" ? "is-active" : ""} onClick={() => setView("list")}><List aria-hidden="true" /></button></div>
-            <button className="results-create" type="button" onClick={onCreate}><Plus aria-hidden="true" />新建成果<ChevronDown aria-hidden="true" /></button>
+            <button className="results-create" type="button" onClick={onCreate}><Plus aria-hidden="true" />开始新研究</button>
           </div>
         </div>
 

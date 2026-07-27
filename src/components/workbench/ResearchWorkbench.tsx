@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ResearchDashboard } from "@/lib/repositories/researchDashboard";
+import type { ResearchDashboard, ResearchDashboardCompany } from "@/lib/repositories/researchDashboard";
 import type { ResearchQueue, ResearchQueueItem } from "@/lib/repositories/researchQueue";
 import { CompanyDetails } from "./CompanyDetails";
 import { ResearchIntelligenceDock, type IntelligenceTab } from "./ResearchIntelligenceDock";
@@ -104,6 +104,17 @@ export function ResearchWorkbench({
       ?? queue?.items.find((item) => item.stockCode === selectedStockCode)
       ?? null;
   }, [queue, selectedCategoryId, selectedStockCode]);
+  const selectedDashboardCompany = useMemo(
+    () => dashboard?.companies.find((company) => company.stockCode === selectedStockCode) ?? null,
+    [dashboard, selectedStockCode],
+  );
+  const defaultIntelligenceTarget = queue?.items[0] ?? dashboard?.companies[0] ?? null;
+  const intelligenceTarget = selectedStockCode ? {
+    stockCode: selectedStockCode,
+    shortName: selectedItem?.shortName ?? selectedDashboardCompany?.shortName ?? selectedStockCode,
+    categoryId: selectedItem?.categoryId ?? selectedDashboardCompany?.categoryId ?? selectedCategoryId,
+    categoryName: selectedItem?.categoryName ?? selectedDashboardCompany?.categoryName ?? "",
+  } : defaultIntelligenceTarget;
 
   const selectCompany = (stockCode: string, categoryId: number | null) => {
     setActiveView("profile");
@@ -153,9 +164,10 @@ export function ResearchWorkbench({
           ) : (
             <ResearchIntelligenceDock
               embedded
-              stockCode={selectedStockCode ?? queue?.items[0]?.stockCode ?? dashboard?.companies[0]?.stockCode ?? null}
-              companyName={selectedItem?.shortName ?? queue?.items[0]?.shortName ?? dashboard?.companies[0]?.shortName ?? ""}
-              categoryId={selectedCategoryId ?? queue?.items[0]?.categoryId ?? dashboard?.companies[0]?.categoryId ?? null}
+              stockCode={intelligenceTarget?.stockCode ?? null}
+              companyName={intelligenceTarget?.shortName ?? ""}
+              categoryId={intelligenceTarget?.categoryId ?? null}
+              categoryName={intelligenceTarget?.categoryName ?? ""}
               tab={activeView}
               onTabChange={setActiveView}
               onClose={() => setActiveView("profile")}
@@ -203,6 +215,7 @@ function ResearchDeskOverview({
   onOpenQueue: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [catalogMatch, setCatalogMatch] = useState<ResearchDashboardCompany | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const companies = dashboard?.companies ?? [];
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -210,7 +223,7 @@ function ResearchDeskOverview({
     !normalizedQuery
     || [company.shortName, company.stockCode, company.categoryName].join(" ").toLocaleLowerCase().includes(normalizedQuery),
   );
-  const activeItems = visibleCompanies.slice(0, 3);
+  const activeItems = (visibleCompanies.length ? visibleCompanies : catalogMatch ? [catalogMatch] : []).slice(0, 3);
   const watchItems = companies.filter((company) => company.isWatchlist).slice(0, 5);
   const reportArtifacts = (dashboard?.recentArtifacts ?? []).filter((artifact) => artifact.kind === "report").slice(0, 3);
   const latestTasks = (queue?.items ?? []).slice(0, 3);
@@ -226,6 +239,44 @@ function ResearchDeskOverview({
     window.addEventListener("keydown", focusSearch);
     return () => window.removeEventListener("keydown", focusSearch);
   }, []);
+
+  useEffect(() => {
+    if (!normalizedQuery || visibleCompanies.length) {
+      setCatalogMatch(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/stocks/lookup?mode=quick&query=${encodeURIComponent(query.trim())}`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() : null)
+        .then((payload) => {
+          const profile = payload?.profile as { stockCode?: string; shortName?: string; industry?: string; categoryId?: number | null; categoryName?: string } | undefined;
+          if (!profile?.stockCode) {
+            setCatalogMatch(null);
+            return;
+          }
+          setCatalogMatch({
+            stockCode: profile.stockCode,
+            shortName: profile.shortName || profile.stockCode,
+            categoryId: profile.categoryId ?? null,
+            categoryName: profile.categoryName || profile.industry || "目录公司",
+            relationId: 0,
+            evidenceCount: 0,
+            hasResearchProfile: false,
+            isWatchlist: false,
+            updatedAt: "",
+            isStarterExample: true,
+          });
+        })
+        .catch((error) => {
+          if (!(error instanceof DOMException && error.name === "AbortError")) setCatalogMatch(null);
+        });
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [normalizedQuery, query, visibleCompanies.length]);
 
   if (status === "loading" && !dashboard) {
     return <WorkspaceState state="loading" title="正在读取研究工作区" description="汇总公司档案、有效证据、成果与任务" />;
@@ -271,7 +322,7 @@ function ResearchDeskOverview({
       <article><span className="is-cyan"><Building2 /></span><div><b>活跃公司</b><small>目录共 {dashboard?.stats.catalogCompanies ?? 0} 家</small></div><strong>{dashboard?.stats.activeCompanies ?? 0}</strong></article>
       <article><span className="is-gold"><PieChart /></span><div><b>研究赛道</b><small>有真实研究活动的方向</small></div><strong>{dashboard?.stats.activeCategories ?? 0}</strong></article>
       <article><span className="is-green"><Activity /></span><div><b>有效证据</b><small>已核验或具备可追溯链接</small></div><strong>{dashboard?.stats.effectiveEvidence ?? 0}</strong></article>
-      <article><span className="is-blue"><FileText /></span><div><b>研究成果</b><small>{dashboard?.stats.aiRuns ?? 0} 次 AI 研究</small></div><strong>{dashboard?.stats.reports ?? 0}</strong></article>
+      <article><span className="is-blue"><FileText /></span><div><b>研究成果</b><small>{dashboard?.stats.reports ?? 0} 份报告 · {dashboard?.stats.aiRuns ?? 0} 次 AI 研究</small></div><strong>{dashboard?.stats.artifacts ?? 0}</strong></article>
       <article><span className="is-orange"><ListTodo /></span><div><b>待处理任务</b><small>待核验与资料补全</small></div><strong>{pendingCount}</strong></article>
     </section>
 

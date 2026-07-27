@@ -473,7 +473,15 @@ function detectSyncFailureTasks(db: Database.Database): AutomaticTaskInput[] {
 function detectReportTasks(db: Database.Database): AutomaticTaskInput[] {
   const rows = db.prepare(`
     select report.id, report.title, report.stock_code as stockCode,
-           report.category_id as categoryId, report.subject_label as subjectLabel,
+           case
+             when report.stock_code is null then report.category_id
+             when exists (
+               select 1 from company_category_relations relation
+               where relation.stock_code = report.stock_code and relation.category_id = report.category_id
+             ) then report.category_id
+             else (select min(category_id) from company_category_relations where stock_code = report.stock_code)
+           end as categoryId,
+           report.subject_label as subjectLabel,
            report.status, report.quality_json as qualityJson
     from research_documents report
     where report.status != 'ready'
@@ -505,7 +513,14 @@ function detectReportTasks(db: Database.Database): AutomaticTaskInput[] {
 
 function detectAiTasks(db: Database.Database): AutomaticTaskInput[] {
   const companyRows = db.prepare(`
-    select run.id, run.stock_code as stockCode, run.category_id as categoryId,
+    select run.id, run.stock_code as stockCode,
+           case
+             when exists (
+               select 1 from company_category_relations relation
+               where relation.stock_code = run.stock_code and relation.category_id = run.category_id
+             ) then run.category_id
+             else (select min(category_id) from company_category_relations where stock_code = run.stock_code)
+           end as categoryId,
            run.result_json as resultJson, company.short_name as shortName
     from ai_research_runs run
     join companies company on company.stock_code = run.stock_code

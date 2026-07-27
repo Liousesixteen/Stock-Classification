@@ -8,6 +8,7 @@ import {
   syncAutomaticResearchTasks,
 } from "@/lib/repositories/researchTasks";
 import { upsertCompanyFieldFact } from "@/lib/repositories/companyFieldFacts";
+import { saveResearchRun } from "@/lib/repositories/aiResearch";
 
 function setupDb() {
   const db = new Database(":memory:");
@@ -88,5 +89,39 @@ describe("research tasks repository", () => {
     expect(verified.verificationStatus).toBe("verified");
     expect(verified.verifiedAt).not.toBe("");
     expect(listResearchTasks(db).some((item) => item.id === task?.id)).toBe(false);
+  });
+
+  it("falls back to the company's real category when a historical AI run has a stale category", () => {
+    const db = setupDb();
+    const relation = db.prepare(`
+      select relation.stock_code as stockCode, relation.category_id as categoryId
+      from company_category_relations relation
+      order by relation.id limit 1
+    `).get() as { stockCode: string; categoryId: number };
+    const staleCategory = db.prepare(
+      "select id from categories where id != ? order by id desc limit 1",
+    ).get(relation.categoryId) as { id: number };
+    saveResearchRun(db, {
+      stockCode: relation.stockCode,
+      categoryId: staleCategory.id,
+      question: "历史研究",
+      depth: "quick",
+      result: {
+        thesis: "当前没有足够的可引用证据形成研究结论。",
+        investmentValue: "待验证",
+        confidence: "低",
+        stages: [],
+        catalysts: [],
+        risks: [],
+        verificationQuestions: [],
+        evidenceBoundary: "本地证据",
+        model: "test-model",
+        citations: [],
+      },
+    });
+
+    syncAutomaticResearchTasks(db);
+    const aiTask = listResearchTasks(db).find((task) => task.sourceRef.startsWith("ai-run:"));
+    expect(aiTask?.categoryId).toBe(relation.categoryId);
   });
 });

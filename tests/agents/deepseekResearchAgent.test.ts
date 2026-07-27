@@ -112,4 +112,14 @@ describe("deepseek research agent", () => {
     expect(report.citations).toHaveLength(1);
     expect(report.quality.unsupportedClaimCount).toBe(1);
   });
+
+  it("rejects free-form markdown that bypasses structured citation checks", async () => {
+    const report = await generateResearchReport(facts, null, { reportType: "company", focus: "核心业务" }, { apiKey: "test", model: "test-model" }, () => response({
+      title: "示例公司研究报告",
+      markdown: "# 示例公司研究报告\n\n公司拥有未经证实的绝对领先市场份额。",
+    }));
+    expect(report.markdown).not.toContain("绝对领先市场份额");
+    expect(report.markdown).toContain("待补：当前证据目录不足以支持本节结论。");
+    expect(report.citations).toEqual([]);
+  });
 });

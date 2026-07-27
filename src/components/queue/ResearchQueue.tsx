@@ -28,12 +28,12 @@ import type { ResearchQueue as ResearchQueueData, ResearchQueueItem, ResearchQue
 import { ResizablePanelControls, useResizablePanelLayout } from "@/components/workbench/ResizablePanelControls";
 import { WorkspaceState } from "@/components/workbench/WorkspaceState";
 
-type QueueFilter = "全部" | ResearchQueueReason;
+type QueueFilter = "全部" | "高优" | ResearchQueueReason;
 type QueueSort = "priority" | "updated" | "evidence";
 
 const filterMeta: Array<{ id: QueueFilter; label: string; icon: typeof Flag; hint: string }> = [
   { id: "全部", label: "全部任务", icon: ListChecks, hint: "全部待办" },
-  { id: "已关注", label: "高优任务", icon: Flag, hint: "优先跟踪" },
+  { id: "高优", label: "高优任务", icon: Flag, hint: "优先处理" },
   { id: "待复核", label: "关系核验", icon: ClipboardCheck, hint: "关系待确认" },
   { id: "缺证据", label: "证据补充", icon: FileCheck2, hint: "补充来源" },
   { id: "资料过期", label: "资料过期", icon: CalendarClock, hint: "更新时效" },
@@ -99,9 +99,22 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
   const items = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return (data?.items ?? [])
-      .filter((item) => filter === "全部" || item.reasons.includes(filter))
+      .filter((item) => {
+        if (filter === "全部") return true;
+        if (filter === "高优") return item.priority >= 70;
+        return item.reasons.includes(filter);
+      })
       .filter((item) => track === "all" || item.categoryName === track)
-      .filter((item) => !normalized || [item.shortName, item.stockCode, item.categoryName, item.relationType, ...item.reasons].join(" ").toLowerCase().includes(normalized))
+      .filter((item) => !normalized || [
+        item.shortName,
+        item.stockCode,
+        item.categoryName,
+        item.relationType,
+        item.taskTitle,
+        item.taskDescription,
+        taskMeta(item).label,
+        ...item.reasons,
+      ].join(" ").toLowerCase().includes(normalized))
       .sort((left, right) => {
         if (sort === "updated") return right.updatedAt.localeCompare(left.updatedAt);
         if (sort === "evidence") return left.evidenceCount - right.evidenceCount;
@@ -171,7 +184,7 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
       <div className="task-center-toolbar">
         <label className="task-center-search"><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索公司、赛道、任务类型或关键词" /></label>
         <nav aria-label="任务快速筛选">
-          {filterMeta.map(({ id, label }) => <button type="button" key={id} className={filter === id ? "is-active" : ""} onClick={() => setFilter(id)}>{label}<b>{id === "全部" ? data?.items.length ?? 0 : data?.stats[id] ?? 0}</b></button>)}
+          {filterMeta.map(({ id, label }) => <button type="button" key={id} className={filter === id ? "is-active" : ""} onClick={() => setFilter(id)}>{label}<b>{id === "全部" ? data?.items.length ?? 0 : id === "高优" ? highPriority : data?.stats[id] ?? 0}</b></button>)}
         </nav>
         <label className="task-center-sort"><select value={sort} onChange={(event) => setSort(event.target.value as QueueSort)} aria-label="任务排序"><option value="priority">优先级排序</option><option value="updated">最近更新</option><option value="evidence">证据缺口</option></select><ChevronDown aria-hidden="true" /></label>
         <button className={`task-center-batch ${batchMode ? "is-active" : ""}`} type="button" onClick={() => { setBatchMode((value) => !value); setBatchSelection(new Set()); }}><ListChecks aria-hidden="true" />{batchMode ? "退出批量" : "批量处理"}</button>
@@ -181,7 +194,7 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
         <ResizablePanelControls layout={panels.layout} bounds={panels.bounds} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
         <aside className="task-filter-rail">
           <FilterSection title="任务分类">
-            {filterMeta.map(({ id, label, icon: Icon, hint }) => <button type="button" key={id} className={filter === id ? "is-active" : ""} onClick={() => setFilter(id)}><Icon aria-hidden="true" /><span>{label}<small>{hint}</small></span><b>{id === "全部" ? data?.items.length ?? 0 : data?.stats[id] ?? 0}</b></button>)}
+            {filterMeta.map(({ id, label, icon: Icon, hint }) => <button type="button" key={id} className={filter === id ? "is-active" : ""} onClick={() => setFilter(id)}><Icon aria-hidden="true" /><span>{label}<small>{hint}</small></span><b>{id === "全部" ? data?.items.length ?? 0 : id === "高优" ? highPriority : data?.stats[id] ?? 0}</b></button>)}
           </FilterSection>
           <FilterSection title="优先级">
             <div className="task-priority-legend"><span><i className="is-high" />高优 <b>{highPriority}</b></span><span><i className="is-medium" />中优 <b>{data?.items.filter((item) => item.priority >= 30 && item.priority < 70).length ?? 0}</b></span><span><i className="is-low" />低优 <b>{data?.items.filter((item) => item.priority < 30).length ?? 0}</b></span></div>
