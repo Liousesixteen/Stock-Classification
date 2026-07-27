@@ -453,9 +453,9 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
           <aside className="report-outline">
             <header><span>REPORT OUTLINE</span><b>{report ? '8/9' : '0/9'}</b></header>
             {['投资摘要', '公司概览', '产业链位置', '竞争优势', '财务分析', '催化因素', '风险分析', '估值与结论', '附录证据'].map((item, index) => (
-              <button type="button" key={item} className={index === 0 ? 'is-active' : ''}><i>{String(index + 1).padStart(2, '0')}</i><span>{item}</span>{report && index < 8 ? <CheckCircle2 /> : null}</button>
+              <div key={item} className={index === 0 ? 'is-active' : ''}><i>{String(index + 1).padStart(2, '0')}</i><span>{item}</span>{report && index < 8 ? <CheckCircle2 /> : null}</div>
             ))}
-            <button type="button" className="report-add-section">+ 新增章节</button>
+            <p className="report-add-section">章节由当前报告大纲统一管理</p>
           </aside>
 
           <section className="report-editor" aria-label="研报编辑器">
@@ -479,7 +479,7 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, t
           <aside className="report-quality">
             <section><header><span>引用与质检</span><Quote /></header><div className="report-source-stat"><b>{result?.stages.length ?? 0}</b><span>智能体结论</span></div><div className="report-source-stat"><b>{report ? 1 : 0}</b><span>当前报告</span></div></section>
             <section><header><span>质量评分</span><ShieldAlert /></header><div className="report-score"><b>{report ? 92 : 0}</b><span>/100</span></div><ul><li>事实完整性</li><li>证据引用充分</li><li>结论逻辑严谨</li><li>风险披露清晰</li></ul></section>
-            <section><header><span>导出与发布</span><Download /></header><button type="button" disabled={!report} onClick={() => downloadReport()}>导出 Markdown</button><button type="button" disabled={!report}>发布到研究成果库</button></section>
+            <section><header><span>导出与发布</span><Download /></header><button type="button" disabled={!report} onClick={() => downloadReport()}>导出 Markdown</button><p>{report ? "报告已自动进入成果库" : "生成后自动进入成果库"}</p></section>
           </aside>
         </div>
       )}
@@ -538,6 +538,12 @@ function AiResearchWorkspace({
   onLaunchResearch,
   onOpenReport,
 }: AiResearchWorkspaceProps) {
+  const [dialog, setDialog] = useState<"guide" | "settings" | "context" | null>(null);
+  const [additionalContext, setAdditionalContext] = useState("");
+  const [progressCollapsed, setProgressCollapsed] = useState(false);
+  const [evidenceCollapsed, setEvidenceCollapsed] = useState(false);
+  const [managingFavorites, setManagingFavorites] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>(() => [...FAVORITE_QUESTIONS]);
   const company = target?.companyName ?? "研究标的";
   const researchProgress = result ? 6 : running ? Math.min(activeRole + 1, 5) : 0;
   const answerTitle = result?.thesis ?? `${company}的产业周期与核心价值研判`;
@@ -553,15 +559,15 @@ function AiResearchWorkspace({
   return <div className="ai-studio" aria-label="AI 研究工作空间">
     <header className="ai-studio-hero">
       <div className="ai-studio-brand"><span><Sparkles /><i>AI</i></span><div><h2>AI 研究</h2><p>面向公司、行业、周期、技术与宏观主题的通用研究引擎</p></div></div>
-      <div className="ai-studio-hero-actions"><button type="button"><BookOpenCheck />使用指南</button><button type="button"><Settings2 />研究设置</button></div>
+      <div className="ai-studio-hero-actions"><button type="button" onClick={() => setDialog("guide")}><BookOpenCheck />使用指南</button><button type="button" onClick={() => setDialog("settings")}><Settings2 />研究设置</button></div>
     </header>
 
     <section className="ai-studio-context" aria-label="研究上下文">
       <label className="ai-context-target"><FolderSearch /><input value={targetQuery} onChange={(event) => onTargetQueryChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onResolveTarget(); }} placeholder="输入公司代码或名称" /><button type="button" onClick={onResolveTarget} disabled={resolvingTarget}>{resolvingTarget ? <LoaderCircle className="animate-spin" /> : <Search />}</button></label>
-      <button type="button"><Network /><span>{target?.industry || "产业链研究"}</span><ChevronRight /></button>
-      <button type="button"><CalendarDays /><span>2024-2026</span><ChevronRight /></button>
-      <button type="button"><FileText /><span>{result?.citations?.length ?? 0} 条证据</span><ChevronRight /></button>
-      <button type="button" className="ai-context-add"><Paperclip />添加上下文</button>
+      <span className="ai-context-chip"><Network /><span>{target?.industry || "产业链研究"}</span></span>
+      <span className="ai-context-chip"><CalendarDays /><span>2024-2026</span></span>
+      <span className="ai-context-chip"><FileText /><span>{result?.citations?.length ?? 0} 条证据</span></span>
+      <button type="button" className="ai-context-add" onClick={() => setDialog("context")}><Paperclip />添加上下文</button>
     </section>
 
     {error ? <div className="ai-studio-error"><ShieldAlert />{error}</div> : null}
@@ -569,18 +575,18 @@ function AiResearchWorkspace({
     <div className="ai-studio-grid">
       <aside className="ai-studio-left">
         <section className="ai-side-panel ai-conversations">
-          <header><h3>最近研究</h3><button type="button">当前目标 <ChevronRight /></button></header>
-          <div>{result ? <button type="button" className="is-active"><span><Bot /></span><div><b>{company}</b><small>{result.thesis}</small></div><time>最近</time></button> : <p className="ai-conversation-empty">当前目标尚无已完成研究</p>}</div>
-          <button type="button" className="ai-new-conversation"><MessageSquarePlus />新建会话</button>
+          <header><h3>最近研究</h3><span>当前目标</span></header>
+          <div>{result ? <article className="is-active"><span><Bot /></span><div><b>{company}</b><small>{result.thesis}</small></div><time>最近</time></article> : <p className="ai-conversation-empty">当前目标尚无已完成研究</p>}</div>
+          <button type="button" className="ai-new-conversation" onClick={() => { onQuestionChange(""); setAdditionalContext(""); }}><MessageSquarePlus />新建会话</button>
         </section>
 
         <section className="ai-side-panel ai-favorites">
-          <header><h3>收藏问题</h3><button type="button">管理</button></header>
-          <div>{FAVORITE_QUESTIONS.map((item) => <button type="button" key={item} onClick={() => onQuestionChange(item)}><Bookmark />{item}</button>)}</div>
+          <header><h3>收藏问题</h3><button type="button" onClick={() => setManagingFavorites((value) => !value)}>{managingFavorites ? "完成" : "管理"}</button></header>
+          <div>{favorites.map((item) => <button type="button" key={item} title={managingFavorites ? "从收藏中移除" : "使用这个研究问题"} onClick={() => managingFavorites ? setFavorites((current) => current.filter((value) => value !== item)) : onQuestionChange(item)}><Bookmark />{item}{managingFavorites ? <X aria-hidden="true" /> : null}</button>)}</div>
         </section>
 
         <section className="ai-side-panel ai-template-panel">
-          <header><h3>研究模板</h3><button type="button">全部模板 <ChevronRight /></button></header>
+          <header><h3>研究模板</h3><span>{RESEARCH_TEMPLATES.length} 个模板</span></header>
           <div>{RESEARCH_TEMPLATES.map(([title, detail, Icon]) => <button type="button" key={title} onClick={() => onQuestionChange(`请围绕${title}框架分析${company}，重点覆盖${detail.replaceAll(" / ", "、")}`)}><Icon /><span><b>{title}</b><small>{detail}</small></span></button>)}</div>
         </section>
       </aside>
@@ -612,18 +618,18 @@ function AiResearchWorkspace({
           </article>
         </section>
 
-        <section className="ai-research-progress"><header><b>深度研究进度 {researchProgress}/6</b><button type="button">收起 <ChevronRight /></button></header><div className="ai-progress-line">{["问题理解", "信息检索", "证据分析", "观点生成", "报告整合", "质量校验"].map((item, index) => <span key={item} className={index < researchProgress ? "is-done" : index === researchProgress ? "is-current" : ""}><i>{index < researchProgress ? <Check /> : index + 1}</i><b>{item}</b></span>)}</div></section>
+        <section className={`ai-research-progress ${progressCollapsed ? "is-collapsed" : ""}`}><header><b>深度研究进度 {researchProgress}/6</b><button type="button" aria-expanded={!progressCollapsed} onClick={() => setProgressCollapsed((value) => !value)}>{progressCollapsed ? "展开" : "收起"} <ChevronRight /></button></header>{!progressCollapsed ? <div className="ai-progress-line">{["问题理解", "信息检索", "证据分析", "观点生成", "报告整合", "质量校验"].map((item, index) => <span key={item} className={index < researchProgress ? "is-done" : index === researchProgress ? "is-current" : ""}><i>{index < researchProgress ? <Check /> : index + 1}</i><b>{item}</b></span>)}</div> : null}</section>
 
         <section className="ai-composer">
           <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} placeholder="输入任何研究问题，或使用 @ 引用资料 / 公司 / 指标" aria-label="研究问题" />
-          <footer><div><button type="button"><AtSign />引用</button><button type="button"><Paperclip />附件</button><button type="button"><BarChart3 />指标</button><button type="button"><Table2 />图表</button><button type="button" title="联网数据需先进入 Provider"><Globe2 />数据源</button></div><span>证据约束研究引擎</span><button type="button" className="ai-composer-send" aria-label={running ? "研究运行中" : "开始研究"} onClick={onLaunchResearch} disabled={running || !question.trim()}>{running ? <LoaderCircle className="animate-spin" /> : <Send />}</button></footer>
+          <footer><div><button type="button" onClick={() => setDialog("context")}><AtSign />引用</button><button type="button" onClick={() => setDialog("context")}><Paperclip />附件</button><button type="button" disabled title="结构化指标将在数据源启用后开放"><BarChart3 />指标</button><button type="button" disabled title="先完成研究后在报告工坊生成图表"><Table2 />图表</button><button type="button" disabled title="联网数据需先进入 Provider"><Globe2 />数据源</button></div><span>证据约束研究引擎</span><button type="button" className="ai-composer-send" aria-label={running ? "研究运行中" : "开始研究"} onClick={onLaunchResearch} disabled={running || !question.trim()}>{running ? <LoaderCircle className="animate-spin" /> : <Send />}</button></footer>
         </section>
         <small className="ai-disclaimer">内容由 AI 生成，仅供参考，请结合专业判断。免责声明</small>
       </section>
 
-      <aside className="ai-evidence-rail">
-        <header><h3>研究上下文与证据</h3><button type="button">收起 <ChevronRight /></button></header>
-        <EvidenceGroup title="已引用资料" count={result?.citations?.length ?? 0} tone="source" items={(result?.citations ?? []).slice(0, 6).map((citation) => citation.title)} empty="运行后显示真实引用" />
+      <aside className={`ai-evidence-rail ${evidenceCollapsed ? "is-collapsed" : ""}`}>
+        <header><h3>研究上下文与证据</h3><button type="button" aria-expanded={!evidenceCollapsed} onClick={() => setEvidenceCollapsed((value) => !value)}>{evidenceCollapsed ? "展开" : "收起"} <ChevronRight /></button></header>
+        {!evidenceCollapsed ? <><EvidenceGroup title="已引用资料" count={result?.citations?.length ?? 0} tone="source" items={(result?.citations ?? []).slice(0, 6).map((citation) => citation.title)} empty="运行后显示真实引用" />
         <EvidenceGroup title="支持结论" count={groundedFindings.length} tone="support" items={groundedFindings.slice(0, 5)} empty="尚无有证据支持的结论" />
         <EvidenceGroup title="风险与反证" count={result?.risks.length ?? 0} tone="counter" items={(result?.risks ?? []).slice(0, 5)} empty="尚未完成风险审查" />
         <EvidenceGroup title="待核验证据" count={result?.verificationQuestions.length ?? 0} tone="pending" items={(result?.verificationQuestions ?? []).slice(0, 5)} empty="运行后生成核验清单" />
@@ -633,14 +639,15 @@ function AiResearchWorkspace({
           ["角色覆盖", result?.stages.filter((stage) => (stage.citationIds?.length ?? 0) > 0).length ?? 0, (result?.stages.filter((stage) => (stage.citationIds?.length ?? 0) > 0).length ?? 0) * 20],
           ["拦截无引用", result?.unsupportedClaimCount ?? 0, Math.min(100, (result?.unsupportedClaimCount ?? 0) * 20)],
         ].map(([label, value, percent]) => <div key={label}><span>{label}</span><i><b style={{ width: `${percent}%` }} /></i><em>{value}</em></div>)}</section>
-        <button type="button" className="ai-to-report" onClick={onOpenReport}><FileText />转入报告工坊 <ChevronRight /></button>
+        <button type="button" className="ai-to-report" onClick={onOpenReport}><FileText />转入报告工坊 <ChevronRight /></button></> : <p className="ai-evidence-collapsed-note">{result?.citations?.length ?? 0} 条引用 · {groundedFindings.length} 条支持结论</p>}
       </aside>
     </div>
+    {dialog ? <div className="ai-dialog-shell" role="presentation"><button type="button" className="ai-dialog-backdrop" aria-label="关闭弹窗" onClick={() => setDialog(null)} /><section className="ai-dialog" role="dialog" aria-modal="true" aria-label={dialog === "guide" ? "AI 研究使用指南" : dialog === "settings" ? "研究设置" : "添加研究上下文"}><header><strong>{dialog === "guide" ? "AI 研究使用指南" : dialog === "settings" ? "研究设置" : "添加研究上下文"}</strong><button type="button" aria-label="关闭" onClick={() => setDialog(null)}><X /></button></header>{dialog === "guide" ? <ol><li>先识别公司、行业或开放研究目标。</li><li>选择快速、标准或深度模式，输入需要验证的问题。</li><li>结论只保留带有效证据引用的内容，缺口进入任务中心。</li><li>完成后可转入报告工坊继续写作与归档。</li></ol> : dialog === "settings" ? <div className="ai-dialog-settings"><p>选择研究深度；模式会限制 Agent 调用数、输出 Token 与最长耗时。</p><div>{(["quick", "standard", "deep"] as const).map((value) => <button type="button" className={depth === value ? "is-active" : ""} key={value} onClick={() => onDepthChange(value)}>{value === "quick" ? "快速 · 单 Agent" : value === "standard" ? "标准 · 五角色" : "深度 · 扩展预算"}</button>)}</div></div> : <div className="ai-dialog-context"><p>补充会议纪要、关注假设或需要优先核验的边界。内容会附加到本次研究问题中。</p><textarea rows={6} value={additionalContext} onChange={(event) => setAdditionalContext(event.target.value)} placeholder="例如：重点核验海外收入的持续性，不采纳无原文链接的市场传闻。" /><button type="button" disabled={!additionalContext.trim()} onClick={() => { onQuestionChange(`${question.trim()}\n\n补充上下文：${additionalContext.trim()}`.trim()); setDialog(null); }}>加入本次研究</button></div>}</section></div> : null}
   </div>;
 }
 
 function EvidenceGroup({ title, count, tone, items, empty }: { title: string; count: number; tone: string; items: string[]; empty: string }) {
-  return <section className={`ai-evidence-group is-${tone}`}><header><b>{title}</b><button type="button">{count} 条 <ChevronRight /></button></header><ul>{items.length ? items.map((item) => <li key={item}><span />{item}<small>{tone === "counter" ? "反驳" : tone === "pending" ? "待核" : tone === "source" ? "来源" : "支持"}</small></li>) : <li className="is-empty"><span />{empty}<small>待运行</small></li>}</ul></section>;
+  return <details className={`ai-evidence-group is-${tone}`} open><summary><b>{title}</b><span>{count} 条 <ChevronRight /></span></summary><ul>{items.length ? items.map((item) => <li key={item}><span />{item}<small>{tone === "counter" ? "反驳" : tone === "pending" ? "待核" : tone === "source" ? "来源" : "支持"}</small></li>) : <li className="is-empty"><span />{empty}<small>待运行</small></li>}</ul></details>;
 }
 
 function ResearchResult({ result }: { result: DeepResearchResult }) {

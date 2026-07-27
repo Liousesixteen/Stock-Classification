@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResearchIntelligenceDock } from "@/components/workbench/ResearchIntelligenceDock";
@@ -87,5 +87,37 @@ describe("ResearchIntelligenceDock", () => {
       categoryId: 12,
     })));
     expect(screen.getByText("电子")).toBeVisible();
+  });
+
+  it("connects guide, settings, context and collapsible research controls", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ run: null }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    render(createElement(ResearchIntelligenceDock, baseProps));
+
+    fireEvent.click(await screen.findByRole("button", { name: "使用指南" }));
+    const guide = screen.getByRole("dialog", { name: "AI 研究使用指南" });
+    expect(within(guide).getByText(/只保留带有效证据引用/)).toBeVisible();
+    fireEvent.click(within(guide).getByRole("button", { name: "关闭" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "研究设置" }));
+    const settings = screen.getByRole("dialog", { name: "研究设置" });
+    const quickSetting = within(settings).getByRole("button", { name: /快速/ });
+    fireEvent.click(quickSetting);
+    expect(quickSetting).toHaveClass("is-active");
+    fireEvent.click(within(settings).getByRole("button", { name: "关闭" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "添加上下文" }));
+    const context = screen.getByRole("dialog", { name: "添加研究上下文" });
+    fireEvent.change(within(context).getByPlaceholderText(/重点核验海外收入/), { target: { value: "只核验官方来源" } });
+    fireEvent.click(within(context).getByRole("button", { name: "加入本次研究" }));
+    expect((screen.getByRole("textbox", { name: "研究问题" }) as HTMLTextAreaElement).value).toContain("只核验官方来源");
+
+    const collapse = screen.getAllByRole("button", { name: "收起" })[0];
+    fireEvent.click(collapse);
+    expect(screen.queryByText("问题理解")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开" })).toHaveAttribute("aria-expanded", "false");
   });
 });

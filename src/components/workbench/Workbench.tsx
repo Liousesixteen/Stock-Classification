@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
+import { CheckCircle2, ChevronDown, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SectorResearch } from "@/components/sector/SectorResearch";
 import { ResearchQueue } from "@/components/queue/ResearchQueue";
@@ -26,6 +26,8 @@ export function Workbench() {
   const [researchHomeKey, setResearchHomeKey] = useState(0);
   const [pendingCompanySelection, setPendingCompanySelection] = useState<{ stockCode: string; categoryId: number | null } | null>(null);
   const [researchFocusTask, setResearchFocusTask] = useState<ResearchQueueItem | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [runtimeStatus, setRuntimeStatus] = useState<{ deepseekConfigured: boolean; model: string; profileProvidersEnabled: boolean } | null>(null);
 
   useEffect(() => {
     setSelectedStockCode(null);
@@ -43,6 +45,10 @@ export function Workbench() {
       setMode("queue");
     }
   }, []);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [mode]);
 
   const changeMode = (nextMode: WorkbenchMode) => {
     setMode(nextMode);
@@ -72,6 +78,16 @@ export function Workbench() {
 
   const refresh = () => setRefreshKey((value) => value + 1);
 
+  const toggleProfile = () => {
+    setProfileOpen((value) => !value);
+    if (!runtimeStatus) {
+      fetch("/api/runtime-config", { cache: "no-store" })
+        .then((response) => response.ok ? response.json() : null)
+        .then((payload) => setRuntimeStatus(payload))
+        .catch(() => setRuntimeStatus({ deepseekConfigured: false, model: "未知", profileProvidersEnabled: false }));
+    }
+  };
+
   return (
     <main className={`app-shell is-terminal-mode flex h-screen overflow-hidden ${mode === "atlas" ? "is-atlas-mode" : ""} ${mode === "results" ? "is-results-mode" : ""}`}>
       <div className="flex min-h-0 w-full flex-col">
@@ -95,9 +111,15 @@ export function Workbench() {
             }}
             onOpenQueue={() => changeMode("queue")}
           />
-          <button type="button" className="workspace-profile" title="账户与偏好设置" aria-label="账户与偏好设置">
+          <button type="button" className="workspace-profile" title="账户与偏好设置" aria-label="账户与偏好设置" aria-expanded={profileOpen} onClick={toggleProfile}>
             <span>N</span><ChevronDown aria-hidden="true" />
           </button>
+          {profileOpen ? <aside className="workspace-profile-popover" role="dialog" aria-label="账户与运行配置">
+            <header><div><span>N</span><div><strong>本地研究工作区</strong><small>账户与运行配置</small></div></div><button type="button" aria-label="关闭账户设置" onClick={() => setProfileOpen(false)}><X aria-hidden="true" /></button></header>
+            <section><b>AI 研究服务</b><p className={runtimeStatus?.deepseekConfigured ? "is-ready" : "is-pending"}>{runtimeStatus?.deepseekConfigured ? <CheckCircle2 aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}{runtimeStatus ? runtimeStatus.deepseekConfigured ? `DeepSeek 已配置 · ${runtimeStatus.model}` : "DeepSeek 尚未配置" : "正在读取安全配置…"}</p></section>
+            <section><b>公司资料 Provider</b><p className={runtimeStatus?.profileProvidersEnabled ? "is-ready" : "is-pending"}><ShieldCheck aria-hidden="true" />{runtimeStatus ? runtimeStatus.profileProvidersEnabled ? "真实数据源已启用" : "当前为本地证据边界模式" : "正在读取运行状态…"}</p></section>
+            <small>密钥只在服务端读取，不会在界面或接口中返回。</small>
+          </aside> : null}
         </div>
         <GlobalMarketTicker />
 

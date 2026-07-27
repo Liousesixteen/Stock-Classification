@@ -572,7 +572,7 @@ export function CompanyDetails({
 
       <nav className="company-profile-tabs" aria-label="公司研究资料分区">
         {['概览', '业务产品', '产业链', '财务估值', '事件催化', '风险', `证据 ${evidenceCount}`].map((item, index) => (
-          <button type="button" className={index === 0 ? 'is-active' : ''} key={item}>{item}</button>
+          <span className={index === 0 ? 'is-active' : ''} key={item}>{item}</span>
         ))}
       </nav>
 

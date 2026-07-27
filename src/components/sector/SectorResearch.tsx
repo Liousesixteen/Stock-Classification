@@ -105,7 +105,7 @@ export function SectorResearch({
         {data.subcategories.length ? <aside className="sector-map">
           <div className="sector-panel-kicker">产业链位置</div>
           <h3>细分方向</h3>
-          <button className="sector-node is-active" type="button"><Layers3 aria-hidden="true" /><span>{data.category.name}</span><b>当前</b></button>
+          <div className="sector-node is-active" aria-current="true"><Layers3 aria-hidden="true" /><span>{data.category.name}</span><b>当前</b></div>
           {data.subcategories.map((category) => (
             <button className="sector-node" key={category.id} type="button" onClick={() => onSelectCategory(category.id)}><span>{category.name}</span><b>{category.companyCount} 家</b></button>
           ))}

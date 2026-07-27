@@ -71,6 +71,8 @@ export function ResearchResultsLibrary({
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<"recent" | "complete">("recent");
   const [view, setView] = useState<ResultsView>("grid");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [preview, setPreview] = useState<ResearchArtifact | null>(null);
   const [archiveError, setArchiveError] = useState("");
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -106,9 +108,19 @@ export function ResearchResultsLibrary({
         return artifact.kind === filter;
       })
       .filter((artifact) => category === "all" || artifact.categoryName === category)
+      .filter((artifact) => !dateFrom || Date.parse(artifact.updatedAt) >= Date.parse(`${dateFrom}T00:00:00`))
+      .filter((artifact) => !dateTo || Date.parse(artifact.updatedAt) <= Date.parse(`${dateTo}T23:59:59`))
       .filter((artifact) => !normalized || [artifact.title, artifact.summary, artifact.companyName, artifact.stockCode, artifact.categoryName, ...artifact.tags].join(" ").toLowerCase().includes(normalized))
       .sort((left, right) => sort === "complete" ? right.completeness - left.completeness : Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
-  }, [category, data, filter, query, sort]);
+  }, [category, data, dateFrom, dateTo, filter, query, sort]);
+
+  const showAll = () => {
+    setFilter("all");
+    setCategory("all");
+    setQuery("");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   const archiveCandidates = useMemo(() => (data?.artifacts ?? []).filter((artifact) => artifact.stage === "ready" && !artifact.archived).slice(0, 3), [data]);
   const recent = (data?.artifacts ?? []).filter((artifact) => !artifact.archived).slice(0, 5);
@@ -166,7 +178,7 @@ export function ResearchResultsLibrary({
       <ResizablePanelControls layout={panels.layout} bounds={panels.bounds} onResize={panels.resize} onResizeByKeyboard={panels.resizeByKeyboard} onToggle={panels.toggle} />
       <aside className="results-filter-rail">
         <label className="results-search"><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、摘要、公司、标签" /></label>
-        <div className="results-filter-title"><span><Filter aria-hidden="true" />筛选条件</span><button type="button" onClick={() => { setFilter("all"); setCategory("all"); setQuery(""); }}>清空</button></div>
+        <div className="results-filter-title"><span><Filter aria-hidden="true" />筛选条件</span><button type="button" onClick={showAll}>清空</button></div>
         <FilterGroup title="成果类型" icon={Layers3}>
           <FilterButton label="全部成果" count={data?.stats.total ?? 0} active={filter === "all"} onClick={() => setFilter("all")} />
           {(Object.keys(kindMeta) as ResearchArtifactKind[]).map((kind) => <FilterButton key={kind} label={kindMeta[kind].label} count={data?.stats.byKind[kind] ?? 0} active={filter === kind} onClick={() => setFilter(kind)} />)}
@@ -179,7 +191,7 @@ export function ResearchResultsLibrary({
           <FilterButton label="草稿与待完善" count={data?.stats.needsWork ?? 0} active={filter === "draft"} onClick={() => setFilter("draft")} />
         </FilterGroup>
         <FilterGroup title="创建时间" icon={CalendarDays}>
-          <div className="results-date-hint"><span>起始日期</span><i /> <span>结束日期</span></div>
+          <div className="results-date-range"><label><span>起始</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label><i /><label><span>结束</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label></div>
         </FilterGroup>
       </aside>
 
@@ -208,16 +220,16 @@ export function ResearchResultsLibrary({
 
       <aside className="results-insights">
         <section className="results-stat-card">
-          <header><h3>成果统计</h3><button type="button">查看全部 <ChevronRight /></button></header>
+          <header><h3>成果统计</h3><button type="button" onClick={showAll}>查看全部 <ChevronRight /></button></header>
           <div className="results-donut" style={{ background: buildDonutGradient(data) } as CSSProperties}><div><b>{data?.stats.total ?? 0}</b><span>总数</span></div></div>
           <ul>{(Object.keys(kindMeta) as ResearchArtifactKind[]).map((kind) => <li key={kind}><i className={`is-${kindMeta[kind].tone}`} /><span>{kindMeta[kind].label}</span><b>{data?.stats.byKind[kind] ?? 0}</b></li>)}</ul>
         </section>
         <section className="results-side-list">
-          <header><h3>最近打开</h3><button type="button">全部 <ChevronRight /></button></header>
+          <header><h3>最近打开</h3><button type="button" onClick={() => { showAll(); setSort("recent"); }}>全部 <ChevronRight /></button></header>
           {recent.map((artifact) => <button type="button" key={artifact.id} onClick={() => setPreview(artifact)}><KindIcon kind={artifact.kind} /><span><b>{artifact.title}</b><small>{formatDate(artifact.updatedAt)}</small></span><ChevronRight aria-hidden="true" /></button>)}
         </section>
         <section className="results-side-list is-archive">
-          <header><h3>推荐归档</h3><button type="button">全部 <ChevronRight /></button></header>
+          <header><h3>推荐归档</h3><button type="button" onClick={() => { showAll(); setSort("complete"); }}>全部 <ChevronRight /></button></header>
           {archiveError ? <p role="alert"><CircleDashed aria-hidden="true" />{archiveError}</p> : null}
           {archiveCandidates.length ? archiveCandidates.map((artifact) => <div key={artifact.id}><FileText aria-hidden="true" /><span><b>{artifact.title}</b><small>完整度 {artifact.completeness}%</small></span><button type="button" onClick={() => void archive(artifact)}>归档</button></div>) : <p><Check aria-hidden="true" />当前没有待归档成果</p>}
         </section>

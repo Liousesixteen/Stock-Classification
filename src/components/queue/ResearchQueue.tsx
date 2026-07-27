@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Archive,
   ArrowRight,
   Building2,
   CalendarClock,
@@ -56,6 +55,7 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
   const [data, setData] = useState<ResearchQueueData | null>(null);
   const [filter, setFilter] = useState<QueueFilter>("全部");
   const [query, setQuery] = useState("");
+  const [track, setTrack] = useState("all");
   const [sort, setSort] = useState<QueueSort>("priority");
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [batchMode, setBatchMode] = useState(false);
@@ -100,13 +100,14 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
     const normalized = query.trim().toLowerCase();
     return (data?.items ?? [])
       .filter((item) => filter === "全部" || item.reasons.includes(filter))
+      .filter((item) => track === "all" || item.categoryName === track)
       .filter((item) => !normalized || [item.shortName, item.stockCode, item.categoryName, item.relationType, ...item.reasons].join(" ").toLowerCase().includes(normalized))
       .sort((left, right) => {
         if (sort === "updated") return right.updatedAt.localeCompare(left.updatedAt);
         if (sort === "evidence") return left.evidenceCount - right.evidenceCount;
         return right.priority - left.priority || right.updatedAt.localeCompare(left.updatedAt);
       });
-  }, [data, filter, query, sort]);
+  }, [data, filter, query, sort, track]);
 
   const selectedItem = data?.items.find((item) => item.taskId === selectedTaskId) ?? items[0] ?? null;
   const highPriority = data?.items.filter((item) => item.priority >= 70).length ?? 0;
@@ -186,13 +187,13 @@ export function ResearchQueue({ refreshKey, onOpenCompany, onOpenTarget, compact
             <div className="task-priority-legend"><span><i className="is-high" />高优 <b>{highPriority}</b></span><span><i className="is-medium" />中优 <b>{data?.items.filter((item) => item.priority >= 30 && item.priority < 70).length ?? 0}</b></span><span><i className="is-low" />低优 <b>{data?.items.filter((item) => item.priority < 30).length ?? 0}</b></span></div>
           </FilterSection>
           <FilterSection title="赛道筛选">
-            <label className="task-track-select">全部赛道<ChevronDown aria-hidden="true" /></label>
-            {Array.from(new Set((data?.items ?? []).map((item) => item.categoryName))).slice(0, 6).map((name) => <button className="task-track-button" type="button" key={name} onClick={() => setQuery(name)}><span>{name}</span><b>{data?.items.filter((item) => item.categoryName === name).length}</b></button>)}
+            <label className="task-track-select"><select value={track} onChange={(event) => setTrack(event.target.value)} aria-label="按赛道筛选任务"><option value="all">全部赛道</option>{Array.from(new Set((data?.items ?? []).map((item) => item.categoryName))).map((name) => <option key={name} value={name}>{name}</option>)}</select><ChevronDown aria-hidden="true" /></label>
+            {Array.from(new Set((data?.items ?? []).map((item) => item.categoryName))).slice(0, 6).map((name) => <button className={`task-track-button ${track === name ? "is-active" : ""}`} type="button" key={name} onClick={() => setTrack(name)}><span>{name}</span><b>{data?.items.filter((item) => item.categoryName === name).length}</b></button>)}
           </FilterSection>
         </aside>
 
         <section className="task-list-panel" aria-label="任务列表">
-          <div className="task-list-heading"><span>共 {items.length} 项任务</span>{batchMode && batchSelection.size ? <button type="button" onClick={() => { const first = items.find((item) => batchSelection.has(item.taskId)); if (first) openTarget(first); }}>处理已选 {batchSelection.size} 项<ArrowRight aria-hidden="true" /></button> : null}</div>
+          <div className="task-list-heading"><span>共 {items.length} 项任务</span>{batchMode && batchSelection.size ? <button type="button" onClick={() => { const first = items.find((item) => batchSelection.has(item.taskId)); if (first) openTarget(first); }}>打开首个已选任务<ArrowRight aria-hidden="true" /></button> : null}</div>
           {loadStatus === "loading" && !data ? <WorkspaceState compact state="loading" title="正在计算研究任务" description="检测字段、证据、关系与报告质量" /> : null}
           {loadStatus === "error" ? <WorkspaceState compact state="error" title="任务中心加载失败" description="已有任务状态不会丢失，可原地重新读取。" onAction={() => setReloadKey((value) => value + 1)} /> : null}
           {loadStatus === "ready" && data && items.length === 0 ? <WorkspaceState compact state="empty" title="当前筛选下没有待处理任务" description="更换筛选条件，或返回工作台继续研究。" icon={<CheckCircle2 aria-hidden="true" />} /> : null}
@@ -233,11 +234,12 @@ function TaskRow({ item, active, batchMode, checked, onCheck, onSelect, onOpen, 
       <span className="task-updated"><small>更新</small><b>{formatDateTime(item.updatedAt)}</b></span>
     </button>
     <button className="task-action" type="button" onClick={onOpen} disabled={busy}>{busy ? "处理中" : meta.action}</button>
-    <button className="task-more" type="button" title="更多任务操作"><MoreVertical aria-hidden="true" /></button>
+    <button className="task-more" type="button" title="查看任务详情" aria-label={`查看 ${item.shortName} 任务详情`} onClick={onSelect}><MoreVertical aria-hidden="true" /></button>
   </article>;
 }
 
 function TaskDetail({ item, onOpen, onAction, busy, error }: { item: ResearchQueueItem; onOpen: () => void; onAction: (action: "start" | "complete" | "dismiss" | "retry") => void; busy: boolean; error: string }) {
+  const [suggestionOffset, setSuggestionOffset] = useState(0);
   const meta = taskMeta(item);
   const requirements = evidenceRequirements(item);
   const target = 1;
@@ -255,7 +257,7 @@ function TaskDetail({ item, onOpen, onAction, busy, error }: { item: ResearchQue
     </section>
     <section className="task-next-actions">
       <h4>建议下一步动作</h4>
-      <div><button type="button" onClick={onOpen}><ShieldCheck aria-hidden="true" />打开定位<small>{targetLabel(item)}</small></button><button type="button" onClick={onOpen}><FileCheck2 aria-hidden="true" />补充资料<small>添加证据</small></button><button type="button" onClick={onOpen}><FileText aria-hidden="true" />生成报告<small>产出结论</small></button><button type="button" onClick={onOpen}><Archive aria-hidden="true" />完善档案<small>沉淀研究</small></button></div>
+      <div><button type="button" onClick={onOpen}><ShieldCheck aria-hidden="true" />打开定位<small>{targetLabel(item)}</small></button></div>
     </section>
     <section className="task-resolution-actions">
       {error ? <p role="alert">{error}</p> : null}
@@ -265,8 +267,8 @@ function TaskDetail({ item, onOpen, onAction, busy, error }: { item: ResearchQue
       <button type="button" disabled={busy} onClick={() => onAction("dismiss")}>暂不处理</button>
     </section>
     <section className="task-system-suggestions">
-      <header><span><Sparkles aria-hidden="true" />系统建议动作</span><button type="button"><CircleDashed aria-hidden="true" />换一批</button></header>
-      <div>{systemSuggestions(item).map((suggestion) => <article key={suggestion.title}><Lightbulb aria-hidden="true" /><b>{suggestion.title}</b><p>{suggestion.description}</p><small>{suggestion.impact}</small></article>)}</div>
+      <header><span><Sparkles aria-hidden="true" />系统建议动作</span><button type="button" onClick={() => setSuggestionOffset((value) => value + 1)}><CircleDashed aria-hidden="true" />换一批</button></header>
+      <div>{rotateSuggestions(systemSuggestions(item), suggestionOffset).map((suggestion) => <article key={suggestion.title}><Lightbulb aria-hidden="true" /><b>{suggestion.title}</b><p>{suggestion.description}</p><small>{suggestion.impact}</small></article>)}</div>
     </section>
   </>;
 }
@@ -315,9 +317,18 @@ function evidenceRequirements(item: ResearchQueueItem) {
 }
 
 function systemSuggestions(item: ResearchQueueItem) {
-  const suggestions = [];
+  const suggestions = [
+    { title: "先打开精确定位", description: `直接进入${targetLabel(item)}，避免重复查找。`, impact: "缩短处理路径" },
+    { title: "完成后回写任务状态", description: "核验证据或字段后，在任务详情确认完成。", impact: "自动更新完整度" },
+  ];
   if (item.reasons.includes("缺证据")) suggestions.push({ title: "优先补充官方来源", description: "从公告、年报或官网业务资料确认直接关系。", impact: "证据完整度预计提升" });
   if (item.reasons.includes("待复核")) suggestions.push({ title: "核验业务占比与持续性", description: "避免仅凭概念标签形成产业链判断。", impact: "关系置信度预计提升" });
   if (item.reasons.includes("待建档")) suggestions.push({ title: "建立结构化公司档案", description: "沉淀主营业务、产业位置、优势与风险字段。", impact: "后续 AI 研究更快速" });
-  return suggestions.slice(0, 3);
+  return suggestions;
+}
+
+function rotateSuggestions<T>(items: T[], offset: number) {
+  if (!items.length) return items;
+  const start = offset % items.length;
+  return [...items.slice(start), ...items.slice(0, start)].slice(0, 3);
 }
