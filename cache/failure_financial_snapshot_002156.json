@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-08-21T22:31:21",
+  "ttl_seconds": 300,
+  "source": "failure",
+  "is_stale": false,
+  "data": {
+    "reason": "HTTPSConnectionPool(host='quotes.sina.cn', port=443): Max retries exceeded with url: /cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022?paperCode=sz002156&source=lrb&type=0&page=1&num=20 (Caused by NameResolutionError(\"HTTPSConnection(host='quotes.sina.cn', port=443): Failed to resolve 'quotes.sina.cn' ([Errno 8] nodename nor servname provided, or not known)\"))"
+  }
+}

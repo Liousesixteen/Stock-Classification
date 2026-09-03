@@ -1,0 +1,85 @@
+{
+  "generated_at": "2026-08-22T06:14:03",
+  "ttl_seconds": 60,
+  "source": "a-stock-data",
+  "is_stale": false,
+  "data": {
+    "indices": [
+      {
+        "code": "sh000001",
+        "name": "上证指数",
+        "price": 3905.2,
+        "change": 1.48,
+        "pct_chg": 0.04,
+        "high": 3912.13,
+        "low": 3883.79,
+        "amount": 883423480000.0,
+        "turnover": 0.92,
+        "source": "a-stock-data:tencent"
+      },
+      {
+        "code": "sz399001",
+        "name": "深证成指",
+        "price": 14094.17,
+        "change": 121.39,
+        "pct_chg": 0.87,
+        "high": 14132.04,
+        "low": 13866.39,
+        "amount": 995840930000.0,
+        "turnover": 2.22,
+        "source": "a-stock-data:tencent"
+      },
+      {
+        "code": "sz399006",
+        "name": "创业板指",
+        "price": 3545.58,
+        "change": 49.99,
+        "pct_chg": 1.43,
+        "high": 3563.06,
+        "low": 3478.52,
+        "amount": 491255970000.0,
+        "turnover": 3.15,
+        "source": "a-stock-data:tencent"
+      },
+      {
+        "code": "sh000688",
+        "name": "科创50",
+        "price": 1653.56,
+        "change": 0.59,
+        "pct_chg": 0.04,
+        "high": 1675.82,
+        "low": 1640.62,
+        "amount": 77573150000.0,
+        "turnover": 1.01,
+        "source": "a-stock-data:tencent"
+      },
+      {
+        "code": "bj899050",
+        "name": "北证50",
+        "price": 1075.38,
+        "change": -6.2,
+        "pct_chg": -0.57,
+        "high": 1082.66,
+        "low": 1071.55,
+        "amount": 13104768300.0,
+        "turnover": 1.66,
+        "source": "a-stock-data:tencent"
+      }
+    ],
+    "northbound": {
+      "net_inflow": 37047000000.0,
+      "status": "净流入",
+      "hgt": -927999999.9999999,
+      "sgt": 37975000000.0
+    },
+    "total_amount": 2461198298300.0,
+    "summary": "指数分化但成长方向有承接",
+    "scenarios": {
+      "base": "大概率围绕 3866.0-3944.0 震荡分化，观察量能和北向资金是否修复",
+      "bull": "若上证放量站上 3944.0 且北向流出收窄，指数有望震荡上修",
+      "bear": "若跌破 3866.0 且净流入扩大，需防题材退潮和高弹性方向补跌"
+    },
+    "source": "a-stock-data",
+    "missing_data": []
+  }
+}

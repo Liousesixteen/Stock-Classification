@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-08-21T22:31:21",
+  "ttl_seconds": 300,
+  "source": "failure",
+  "is_stale": false,
+  "data": {
+    "reason": "HTTPSConnectionPool(host='push2his.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/stock/fflow/daykline/get?secid=0.002156&fields1=f1%2Cf2%2Cf3%2Cf7&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61%2Cf62%2Cf63%2Cf64%2Cf65&lmt=120 (Caused by NameResolutionError(\"HTTPSConnection(host='push2his.eastmoney.com', port=443): Failed to resolve 'push2his.eastmoney.com' ([Errno 8] nodename nor servname provided, or not known)\"))"
+  }
+}
