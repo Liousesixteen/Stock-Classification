@@ -5,7 +5,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { chooseGraphQuality, createFocusedGraphLayout, createGraphLayout, getFocusedGraphNeighborhood, type FocusedGraphNeighborhood } from "@/lib/industry-graph/layout";
+import { chooseGraphQuality, createCompanyFocusedGraphLayout, createFocusedGraphLayout, createGraphLayout, getCompanyFocusedGraphNeighborhood, getFocusedGraphNeighborhood, getOverviewGraphNeighborhood, type CompanyFocusedGraphNeighborhood, type CompanyGraphBranch, type FocusedGraphNeighborhood } from "@/lib/industry-graph/layout";
 import { getRelationEndpoints } from "@/lib/industry-graph/relations";
 import type { IndustryGraphDisplaySettings, IndustryGraphEdge, IndustryGraphNode, IndustryGraphPayload, IndustryGraphSignalFilter } from "@/lib/industry-graph/types";
 import { fillLinkPositions, segsFor } from "@/lib/vendor/galaxy-view/render/linkCurves";
@@ -15,6 +15,8 @@ import { ClusterClouds, NebulaDome } from "@/lib/vendor/galaxy-view/render/nebul
 
 export type GalaxyInteractionState = {
   focusedCategoryId: number | null;
+  focusedCompanyCode: string | null;
+  expandedCompanyBranch: CompanyGraphBranch | null;
   selectedNodeId: string | null;
   highlightedPathNodeIds: string[];
   signalFilter: IndustryGraphSignalFilter;
@@ -74,6 +76,7 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   const nodes = graph.nodes;
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
+  const overviewNeighborhood = getOverviewGraphNeighborhood(graph);
   const degreeByNode = new Map(nodes.map((node) => [node.id, 0]));
   graph.edges.forEach((edge) => {
     degreeByNode.set(edge.source, (degreeByNode.get(edge.source) ?? 0) + 1);
@@ -153,22 +156,27 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   focusOrbits.visible = false;
   graphGroup.add(focusOrbits);
 
-  const renderEdges = graph.edges.flatMap((edge) => {
+  const derivedPeerEdges = buildDerivedPeerEdges(graph);
+  const renderEdges = [...graph.edges, ...derivedPeerEdges].flatMap((edge) => {
     const sourceIndex = nodeIndex.get(edge.source);
     const targetIndex = nodeIndex.get(edge.target);
     if (sourceIndex === undefined || targetIndex === undefined) return [];
-    const color = nodeColor(nodes[sourceIndex]!).lerp(nodeColor(nodes[targetIndex]!), 0.5);
-    color.offsetHSL(0, -0.28, -0.2);
-    if (edge.kind !== "hierarchy") color.multiplyScalar(0.58 + ((edge.strength ?? 50) / 100) * 0.62);
+    const blendedColor = nodeColor(nodes[sourceIndex]!).lerp(nodeColor(nodes[targetIndex]!), 0.5);
+    blendedColor.offsetHSL(0, -0.28, -0.2);
+    const color = edgeSemanticColor(edge, blendedColor);
+    if (edge.kind !== "hierarchy") color.multiplyScalar(0.7 + ((edge.strength ?? 50) / 100) * 0.5);
     return [{ edge, sourceIndex, targetIndex, color }];
   });
+  const renderEdgePairs = renderEdges.map((item) => ({ source: item.sourceIndex, target: item.targetIndex }));
+  const renderEdgeById = new Map(renderEdges.map((item, index) => [item.edge.id, { item, index }]));
   const linkK = segsFor(0.31, quality.tier === "full" ? 5 : 3);
   const linkGeometry = new THREE.BufferGeometry();
   const linkPositions = new Float32Array(renderEdges.length * linkK * 6);
   const linkColors = new Float32Array(renderEdges.length * linkK * 6);
   const linkProgress = new Float32Array(renderEdges.length * linkK * 2);
   const linkPhases = new Float32Array(renderEdges.length * linkK * 2);
-  fillLinkPositions(linkPositions, nodePositions, renderEdges.map((item) => ({ source: item.sourceIndex, target: item.targetIndex })), linkK, 0.31);
+  const linkPatterns = new Float32Array(renderEdges.length * linkK * 2);
+  fillLinkPositions(linkPositions, nodePositions, renderEdgePairs, linkK, 0.31);
   renderEdges.forEach((item, edgeIndex) => {
     writeLinkColor(linkColors, edgeIndex, linkK, item.color);
     const phase = (edgeIndex * 0.61803398875) % 1;
@@ -178,12 +186,15 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
       linkProgress[offset + 1] = (segment + 1) / linkK;
       linkPhases[offset] = phase;
       linkPhases[offset + 1] = phase;
+      linkPatterns[offset] = edgePattern(item.edge);
+      linkPatterns[offset + 1] = edgePattern(item.edge);
     }
   });
   linkGeometry.setAttribute("position", new THREE.BufferAttribute(linkPositions, 3));
   linkGeometry.setAttribute("color", new THREE.BufferAttribute(linkColors, 3));
   linkGeometry.setAttribute("aProgress", new THREE.BufferAttribute(linkProgress, 1));
   linkGeometry.setAttribute("aPhase", new THREE.BufferAttribute(linkPhases, 1));
+  linkGeometry.setAttribute("aPattern", new THREE.BufferAttribute(linkPatterns, 1));
   const linkMaterial = new THREE.ShaderMaterial({
     vertexColors: true,
     transparent: true,
@@ -193,13 +204,16 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
     vertexShader: `
       attribute float aProgress;
       attribute float aPhase;
+      attribute float aPattern;
       varying vec3 vColor;
       varying float vProgress;
       varying float vPhase;
+      varying float vPattern;
       void main() {
         vColor = color;
         vProgress = aProgress;
         vPhase = aPhase;
+        vPattern = aPattern;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -208,12 +222,17 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
       varying vec3 vColor;
       varying float vProgress;
       varying float vPhase;
+      varying float vPattern;
       void main() {
         float wave = 0.72 + 0.28 * sin((vProgress + vPhase + uTime * 0.028) * 6.2831853);
         float cursor = fract(vProgress - uTime * 0.115 + vPhase);
         float head = smoothstep(0.13, 0.0, abs(cursor - 0.5));
         float wake = smoothstep(0.34, 0.0, abs(cursor - 0.38)) * 0.28;
-        float alpha = 0.12 + head * 0.72 + wake;
+        float baseAlpha = 0.12 + head * 0.72 + wake;
+        float dotted = step(0.5, fract(vProgress * 13.0 + vPhase));
+        float dashed = step(0.34, fract(vProgress * 7.0 + vPhase));
+        float patternAlpha = vPattern < 0.5 ? 1.0 : (vPattern < 1.5 ? dotted : dashed);
+        float alpha = baseAlpha * mix(0.18, 1.0, patternAlpha);
         gl_FragColor = vec4(vColor * (wave + head * 1.35), alpha);
       }
     `,
@@ -241,25 +260,13 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   pulseHalos.renderOrder = 2;
   graphGroup.add(pulseHalos, pulsePoints);
   resources.push(pulseGeometry, pulseTexture, pulseMaterial, pulseHaloMaterial);
+  let activePulseEdgeIndexes: number[] = [];
 
-  let highlight: THREE.LineSegments | null = null;
-  let highlightGeometry: THREE.BufferGeometry | null = null;
-  let highlightMaterial: THREE.LineBasicMaterial | null = null;
   const labels = new Map<string, HTMLElement>();
   const labelObjects = new Map<string, CSS2DObject>();
-  const labelLimit = quality.tier === "full" ? 360 : quality.tier === "balanced" ? 240 : 140;
-  const labelNodeIds = new Set([
-    ...categories.map((node) => node.id),
-    ...nodes
-      .filter((node) => node.kind !== "category")
-      .sort((leftNode, rightNode) => labelPriority(rightNode, degreeByNode) - labelPriority(leftNode, degreeByNode))
-      .slice(0, Math.max(0, labelLimit - categories.length))
-      .map((node) => node.id),
-  ]);
-  nodes.forEach((node) => {
-    if (!labelNodeIds.has(node.id)) return;
+  const createNodeLabel = (node: IndustryGraphNode) => {
     const element = document.createElement("span");
-    element.className = `atlas-node-label is-quiet ${node.kind === "category" ? "is-category" : node.kind === "entity" ? "is-entity" : node.kind === "evidence" ? "is-evidence" : "is-company"}`;
+    element.className = `atlas-node-label is-quiet ${node.kind === "category" ? "is-category" : node.kind === "entity" ? `is-entity${node.profileRole ? ` is-profile-${node.profileRole} is-branch-${node.profileBranch}` : ""}` : node.kind === "evidence" ? "is-evidence" : "is-company"}`;
     const name = document.createElement("b");
     name.textContent = node.label;
     element.appendChild(name);
@@ -273,12 +280,85 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
       element.appendChild(source);
     }
     const label = new CSS2DObject(element);
-    label.position.set(...macroPositions[node.id]);
-    label.position.y += node.kind === "category" ? 0.75 : 0.45;
+    const index = nodeIndex.get(node.id) ?? 0;
+    label.position.set(nodePositions[index * 3], nodePositions[index * 3 + 1], nodePositions[index * 3 + 2]);
+    label.position.y += node.kind === "category" ? 2.2 : 1.4;
     graphGroup.add(label);
     labels.set(node.id, element);
     labelObjects.set(node.id, label);
-  });
+  };
+  const syncNodeLabels = (nodeIds: Set<string>) => {
+    labelObjects.forEach((label, nodeId) => {
+      if (nodeIds.has(nodeId)) return;
+      graphGroup.remove(label);
+      labels.get(nodeId)?.remove();
+      labels.delete(nodeId);
+      labelObjects.delete(nodeId);
+    });
+    nodeIds.forEach((nodeId) => {
+      if (labelObjects.has(nodeId)) return;
+      const node = nodeById.get(nodeId);
+      if (node) createNodeLabel(node);
+    });
+  };
+
+  const edgeLabelElements = new Map<string, HTMLElement>();
+  const edgeLabelObjects = new Map<string, CSS2DObject>();
+  const syncEdgeLabels = (edgeIds: Set<string>) => {
+    edgeLabelObjects.forEach((label, edgeId) => {
+      if (edgeIds.has(edgeId)) return;
+      graphGroup.remove(label);
+      edgeLabelElements.get(edgeId)?.remove();
+      edgeLabelElements.delete(edgeId);
+      edgeLabelObjects.delete(edgeId);
+    });
+    edgeIds.forEach((edgeId) => {
+      if (edgeLabelObjects.has(edgeId)) return;
+      const row = renderEdgeById.get(edgeId);
+      if (!row || row.item.edge.kind === "hierarchy" || row.item.edge.kind === "evidenceLink") return;
+      const semantic = edgeSemantic(row.item.edge);
+      const element = document.createElement("span");
+      element.className = `atlas-edge-label is-${semantic.kind} is-visible`;
+      element.textContent = semantic.label;
+      element.setAttribute("aria-hidden", "true");
+      const label = new CSS2DObject(element);
+      graphGroup.add(label);
+      edgeLabelElements.set(edgeId, element);
+      edgeLabelObjects.set(edgeId, label);
+    });
+  };
+  const updateEdgeLabelPositions = () => {
+    const visibleRowsBySemantic = new Map<EdgeSemanticKind, string[]>();
+    edgeLabelObjects.forEach((_label, edgeId) => {
+      const row = renderEdgeById.get(edgeId);
+      if (!row) return;
+      const kind = edgeSemantic(row.item.edge).kind;
+      const rows = visibleRowsBySemantic.get(kind) ?? [];
+      rows.push(edgeId);
+      visibleRowsBySemantic.set(kind, rows);
+    });
+    edgeLabelObjects.forEach((label, edgeId) => {
+      const row = renderEdgeById.get(edgeId);
+      if (!row) return;
+      const { item, index } = row;
+      const { edge, sourceIndex, targetIndex } = item;
+      const semantic = edgeSemantic(edge);
+      const semanticRows = visibleRowsBySemantic.get(semantic.kind) ?? [];
+      const laneIndex = Math.max(0, semanticRows.indexOf(edgeId));
+      const laneCount = Math.max(semanticRows.length, 1);
+      const progress = laneCount === 1
+        ? semantic.kind === "peer" ? 0.58 : semantic.kind === "category" ? 0.47 : 0.54
+        : 0.38 + (laneIndex / (laneCount - 1)) * 0.28;
+      const sourceOffset = sourceIndex * 3;
+      const targetOffset = targetIndex * 3;
+      const laneOffset = (laneIndex - (laneCount - 1) / 2) * 0.44;
+      label.position.set(
+        THREE.MathUtils.lerp(nodePositions[sourceOffset] ?? 0, nodePositions[targetOffset] ?? 0, progress) + laneOffset,
+        THREE.MathUtils.lerp(nodePositions[sourceOffset + 1] ?? 0, nodePositions[targetOffset + 1] ?? 0, progress) + 1.3 + (index % 2) * 0.42,
+        THREE.MathUtils.lerp(nodePositions[sourceOffset + 2] ?? 0, nodePositions[targetOffset + 2] ?? 0, progress),
+      );
+    });
+  };
 
   const starScale = quality.tier === "full" ? 0.18 : quality.tier === "balanced" ? 0.12 : 0.08;
   const stars = buildStarfield(graphRadius(nodePositions) * 6.5, starScale);
@@ -294,7 +374,7 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   nebula.setIntensity(quality.tier === "full" ? 0.08 : 0.04);
   scene.add(nebula.object);
   const clusterClouds = new ClusterClouds();
-  clusterClouds.rebuild({ nodes: nodes.map((node) => ({ degree: degreeByNode.get(node.id) ?? 0 })) }, nodePositions, graphRadius(nodePositions));
+  clusterClouds.rebuild({ nodes: nodes.map((node) => ({ degree: overviewNeighborhood.visibleNodeIds.has(node.id) ? degreeByNode.get(node.id) ?? 0 : 0 })) }, nodePositions, graphRadius(nodePositions));
   clusterClouds.recolor((index) => new THREE.Color().fromArray(nodeColors, index * 3));
   clusterClouds.setIntensity(quality.tier === "full" ? 0.12 : 0.06);
   scene.add(clusterClouds.points);
@@ -305,6 +385,8 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   let hoveredId: string | null = null;
   let interaction: GalaxyInteractionState = {
     focusedCategoryId: null,
+    focusedCompanyCode: null,
+    expandedCompanyBranch: null,
     selectedNodeId: null,
     highlightedPathNodeIds: [],
     signalFilter: "all",
@@ -321,19 +403,26 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   let targetCamera = camera.position.clone();
   let targetControl = controls.target.clone();
   let layoutSettling = false;
+  let activeLayoutNodeIndexes: number[] = [];
+  const activeRenderEdgePairs: Array<{ source: number; target: number } | undefined> = renderEdgePairs.map(() => undefined);
   let localVisibleRadius = 48;
   let targetGroupRotationZ = graphGroup.rotation.z;
   const clock = new THREE.Clock();
   let elapsed = 0;
-  const radius = graphRadius(nodePositions);
-  const overviewDistance = radius * 2.25;
+  const radius = graphRadiusForNodeIds(nodePositions, nodeIndex, overviewNeighborhood.visibleNodeIds);
+  const overviewDistance = Math.max(520, radius * 2.05);
   const overviewPosition = new THREE.Vector3(0, Math.sin(THREE.MathUtils.degToRad(50)) * overviewDistance, Math.cos(THREE.MathUtils.degToRad(50)) * overviewDistance);
   camera.position.copy(overviewPosition);
   targetCamera.copy(overviewPosition);
 
-  let focusedNeighborhood: FocusedGraphNeighborhood | null = null;
+  let focusedNeighborhood: FocusedGraphNeighborhood | CompanyFocusedGraphNeighborhood | null = null;
   let boundaryCategoryIds = new Set<number>();
   const updateFocusedNeighborhood = () => {
+    if (interaction.focusedCompanyCode !== null) {
+      focusedNeighborhood = getCompanyFocusedGraphNeighborhood(graph, interaction.focusedCompanyCode, interaction.expandedCompanyBranch);
+      boundaryCategoryIds = new Set();
+      return;
+    }
     const focusId = interaction.focusedCategoryId;
     if (focusId === null) {
       focusedNeighborhood = null;
@@ -355,16 +444,39 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
     return Boolean(edge.isWatchlist);
   };
   const nodeVisible = (node: IndustryGraphNode) => {
-    return focusedNeighborhood === null || focusedNeighborhood.visibleNodeIds.has(node.id);
+    return focusedNeighborhood === null
+      ? overviewNeighborhood.visibleNodeIds.has(node.id)
+      : focusedNeighborhood.visibleNodeIds.has(node.id);
   };
-  const edgeVisible = (edge: IndustryGraphEdge) => focusedNeighborhood === null || focusedNeighborhood.visibleEdgeIds.has(edge.id);
-  const nodeRenderable = (node: IndustryGraphNode) => node.kind === "company"
-    ? interaction.displaySettings.showCompanies
-    : node.kind === "category"
-      ? interaction.displaySettings.showCategories
-      : node.kind === "evidence"
-        ? interaction.displaySettings.showEvidenceHeat
-        : interaction.displaySettings.showCompanies;
+  const edgeVisible = (edge: IndustryGraphEdge) => {
+    if (edge.id.startsWith("derived-peer:")) {
+      const focusCompanyNodeId = interaction.focusedCompanyCode ? `company:${interaction.focusedCompanyCode}` : null;
+      return Boolean(focusCompanyNodeId && edge.source === focusCompanyNodeId && focusedNeighborhood?.visibleNodeIds.has(edge.target));
+    }
+    return focusedNeighborhood === null
+      ? overviewNeighborhood.visibleEdgeIds.has(edge.id)
+      : focusedNeighborhood.visibleEdgeIds.has(edge.id);
+  };
+  const nodeRenderable = (node: IndustryGraphNode) => {
+    const overview = interaction.focusedCategoryId === null && interaction.focusedCompanyCode === null;
+    if (overview) {
+      // The overview exposes two taxonomy tiers plus a small representative
+      // company orbit for root classifications that do not have child categories.
+      // This completes every top-level cluster without drawing all 5,522 stocks.
+      return node.kind === "category"
+        ? interaction.displaySettings.showCategories
+        : node.kind === "company"
+          ? interaction.displaySettings.showCompanies
+          : false;
+    }
+    return node.kind === "company"
+      ? interaction.displaySettings.showCompanies
+      : node.kind === "category"
+        ? interaction.displaySettings.showCategories
+        : node.kind === "evidence"
+          ? interaction.displaySettings.showEvidenceHeat
+          : interaction.displaySettings.showCompanies;
+  };
   const edgeRenderable = (edge: IndustryGraphEdge) => {
     if (!interaction.displaySettings.showLinks || !edgeVisible(edge) || !matchesSignal(edge)) return false;
     const source = nodeById.get(edge.source);
@@ -381,64 +493,76 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
   const updateLayoutTarget = () => {
     updateFocusedNeighborhood();
     const focusId = interaction.focusedCategoryId;
-    const localPositions = focusId === null ? null : createFocusedGraphLayout(graph, focusId);
+    const companyCode = interaction.focusedCompanyCode;
+    const localFocus = focusId !== null || companyCode !== null;
+    const localPositions = companyCode !== null
+      ? createCompanyFocusedGraphLayout(graph, companyCode, interaction.expandedCompanyBranch)
+      : focusId === null ? null : createFocusedGraphLayout(graph, focusId);
     localVisibleRadius = 18;
+    activeLayoutNodeIndexes = [];
     nodes.forEach((node, index) => {
       const raw = localPositions?.[node.id] ?? rawPositions[node.id];
-      const scale = focusId === null ? 12 : 4.4;
-      const radialLift = focusId === null ? (node.kind === "category" ? Math.sin(node.layoutSeed * 0.000013) * 22 : Math.sin(node.layoutSeed * 0.000017) * 34) : 0;
+      const scale = localFocus ? 4.4 : 12;
+      const radialLift = localFocus ? 0 : (node.kind === "category" ? Math.sin(node.layoutSeed * 0.000013) * 22 : Math.sin(node.layoutSeed * 0.000017) * 34);
       targetNodePositions[index * 3] = raw[0] * scale;
       targetNodePositions[index * 3 + 1] = raw[1] * scale + radialLift;
       targetNodePositions[index * 3 + 2] = raw[2] * scale;
-      if (focusId !== null && nodeVisible(node)) localVisibleRadius = Math.max(localVisibleRadius, Math.hypot(raw[0] * scale, raw[1] * scale, raw[2] * scale));
+      if (nodeVisible(node) && nodeRenderable(node)) {
+        activeLayoutNodeIndexes.push(index);
+        if (localFocus) localVisibleRadius = Math.max(localVisibleRadius, Math.hypot(raw[0] * scale, raw[1] * scale, raw[2] * scale));
+      } else {
+        nodePositions[index * 3] = targetNodePositions[index * 3];
+        nodePositions[index * 3 + 1] = targetNodePositions[index * 3 + 1];
+        nodePositions[index * 3 + 2] = targetNodePositions[index * 3 + 2];
+      }
     });
-    targetGroupRotationZ = focusId === null ? -0.04 : 0;
-    host.classList.toggle("is-local-focus", focusId !== null);
-    focusHalo.visible = focusId !== null;
-    focusOrbits.visible = focusId !== null;
-    clusterClouds.setIntensity(focusId === null ? (quality.tier === "full" ? 0.12 : 0.06) : 0.018);
-    nebula.setIntensity(focusId === null ? (quality.tier === "full" ? 0.08 : 0.04) : 0.022);
+    fillLinkPositions(linkPositions, nodePositions, activeRenderEdgePairs, linkK, localFocus ? 0.38 : 0.31);
+    (nodeGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+    (linkGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+    targetGroupRotationZ = localFocus ? 0 : -0.04;
+    host.classList.toggle("is-local-focus", localFocus);
+    host.classList.toggle("is-company-focus", companyCode !== null);
+    focusHalo.visible = localFocus;
+    focusOrbits.visible = localFocus;
+    focusHalo.scale.setScalar(companyCode !== null ? 104 : 62);
+    clusterClouds.setIntensity(localFocus ? 0.018 : (quality.tier === "full" ? 0.12 : 0.06));
+    nebula.setIntensity(localFocus ? 0.022 : (quality.tier === "full" ? 0.08 : 0.04));
     layoutSettling = true;
   };
   const setCameraTarget = () => {
-    if (interaction.focusedCategoryId === null) {
+    if (interaction.focusedCategoryId === null && interaction.focusedCompanyCode === null) {
       targetCamera = overviewPosition.clone();
       targetControl = new THREE.Vector3();
       controls.autoRotate = quality.tier !== "reduced";
       cameraFollowing = true;
       return;
     }
-      const distance = Math.max(138, Math.min(260, localVisibleRadius * 1.82 + 52));
-      targetCamera = new THREE.Vector3(0, 0, distance);
-    targetControl = new THREE.Vector3(0, 0, 0);
+    const distance = interaction.focusedCompanyCode !== null
+      ? Math.max(108, Math.min(194, localVisibleRadius * 1.28 + 30))
+      : Math.max(138, Math.min(260, localVisibleRadius * 1.82 + 52));
+    targetCamera = new THREE.Vector3(0, 0, distance);
+    targetControl = interaction.focusedCompanyCode !== null
+      ? new THREE.Vector3(0, 0, 0)
+      : new THREE.Vector3(0, 0, 0);
     controls.autoRotate = false;
     cameraFollowing = true;
   };
-  const updateHighlight = () => {
-    const path = new Set(interaction.highlightedPathNodeIds);
-    const selected = interaction.selectedNodeId;
-    const edgeRows = renderEdges.filter(({ edge }) => edgeRenderable(edge) && ((path.size > 1 && path.has(edge.source) && path.has(edge.target)) || (selected !== null && (edge.source === selected || edge.target === selected))));
-    if (highlight) graphGroup.remove(highlight);
-    highlightGeometry?.dispose();
-    highlightMaterial?.dispose();
-    highlight = null;
-    if (!edgeRows.length) return;
-    const pos = new Float32Array(edgeRows.length * 6);
-    const colors = new Float32Array(edgeRows.length * 6);
-    edgeRows.forEach((item, index) => writeEdge(pos, colors, index, item, nodePositions, item.color.clone().lerp(new THREE.Color(0xffffff), 0.28)));
-    highlightGeometry = new THREE.BufferGeometry();
-    highlightGeometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    highlightGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    highlightMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false });
-    highlight = new THREE.LineSegments(highlightGeometry, highlightMaterial);
-    highlight.renderOrder = 3;
-    graphGroup.add(highlight);
-  };
+  // Active relationships are emphasized in the curved link shader itself.
+  // Drawing a second LineSegments overlay would create a straight chord and
+  // visually flatten the spherical orbit.
   // Hovering changes visual emphasis only. Reframing is reserved for a deliberate
   // selection/focus change so an analyst's manual camera position is never overwritten.
   const applyState = (shouldReframe = false) => {
     updateFocusedNeighborhood();
-    const localFocus = interaction.focusedCategoryId !== null;
+    const localFocus = interaction.focusedCategoryId !== null || interaction.focusedCompanyCode !== null;
+    if (fieldStars.material.sizeAttenuation === localFocus) {
+      fieldStars.material.sizeAttenuation = !localFocus;
+      fieldStars.material.needsUpdate = true;
+    }
+    if (graphDust.material.sizeAttenuation === localFocus) {
+      graphDust.material.sizeAttenuation = !localFocus;
+      graphDust.material.needsUpdate = true;
+    }
     const path = new Set(interaction.highlightedPathNodeIds);
     const visibleEndpointIds = new Set<string>();
     if (localFocus) {
@@ -448,56 +572,94 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
         visibleEndpointIds.add(edge.target);
       });
     }
+    const desiredNodeLabelIds = new Set(
+      nodes
+        .filter((node) => localFocus
+          ? nodeVisible(node) && nodeRenderable(node)
+          : node.kind === "category" && node.level <= 1 && nodeRenderable(node))
+        .map((node) => node.id),
+    );
+    syncNodeLabels(desiredNodeLabelIds);
     nodes.forEach((node, index) => {
       const focused = nodeVisible(node);
       const renderable = nodeRenderable(node);
       const active = node.id === interaction.selectedNodeId || node.id === hoveredId || path.has(node.id);
       nodeDim[index] = !renderable ? 0.001 : active ? 1 : focused ? 0.86 : 0.065;
-      const boundaryCategory = interaction.focusedCategoryId !== null && node.kind === "category" && boundaryCategoryIds.has(node.categoryId);
+      const companyContextCategory = interaction.focusedCompanyCode !== null
+        && node.kind === "category"
+        && focusedNeighborhood !== null
+        && "contextCategoryIds" in focusedNeighborhood
+        && focusedNeighborhood.contextCategoryIds.has(node.categoryId);
+      const companyDirectCategory = interaction.focusedCompanyCode !== null
+        && node.kind === "category"
+        && focusedNeighborhood !== null
+        && "categoryIds" in focusedNeighborhood
+        && focusedNeighborhood.categoryIds.has(node.categoryId);
+      const boundaryCategory = node.kind === "category" && (
+        (interaction.focusedCategoryId !== null && boundaryCategoryIds.has(node.categoryId))
+        || companyContextCategory
+      );
       const showCategory = interaction.focusedCategoryId !== null && node.kind === "category" && focused;
-      const directCompany = interaction.focusedCategoryId !== null && node.kind === "company" && relationCategories.get(node.id)?.has(interaction.focusedCategoryId);
-      const showFocusedCompany = interaction.focusedCategoryId !== null && node.kind === "company" && focused;
+      const isCompanyFocus = interaction.focusedCompanyCode !== null && node.id === `company:${interaction.focusedCompanyCode}`;
+      const directCompany = isCompanyFocus || (interaction.focusedCategoryId !== null && node.kind === "company" && relationCategories.get(node.id)?.has(interaction.focusedCategoryId));
+      const showFocusedCompany = localFocus && node.kind === "company" && focused;
       const connectedEndpoint = visibleEndpointIds.has(node.id);
+      const overviewLabel = !localFocus && node.kind === "category" && node.level <= 1;
       const label = labels.get(node.id);
-      label?.classList.toggle("is-quiet", !renderable || !(active || showCategory || showFocusedCompany || connectedEndpoint));
+      label?.classList.toggle("is-quiet", !renderable || !(active || overviewLabel || showCategory || showFocusedCompany || connectedEndpoint));
       label?.classList.toggle("is-active", active);
       label?.classList.toggle("is-muted", !focused);
-      label?.classList.toggle("is-local", interaction.focusedCategoryId !== null && focused);
-      label?.classList.toggle("is-local-focus", interaction.focusedCategoryId !== null && node.kind === "category" && node.categoryId === interaction.focusedCategoryId);
+      label?.classList.toggle("is-local", localFocus && focused);
+      label?.classList.toggle("is-local-focus", (interaction.focusedCategoryId !== null && node.kind === "category" && node.categoryId === interaction.focusedCategoryId) || isCompanyFocus);
       label?.classList.toggle("is-boundary", boundaryCategory);
-      label?.classList.toggle("is-local-company", interaction.focusedCategoryId !== null && node.kind === "company" && focused);
+      label?.classList.toggle("is-local-company", localFocus && node.kind === "company" && focused);
       label?.classList.toggle("is-local-direct", Boolean(directCompany));
       label?.classList.toggle("is-edge-endpoint", localFocus && connectedEndpoint);
       const color = new THREE.Color().fromArray(baseNodeColors, index * 3);
-      if (interaction.focusedCategoryId !== null && focused) {
-        if (node.kind === "category" && node.categoryId === interaction.focusedCategoryId) color.set(0xf0c967);
+      if (localFocus && focused) {
+        if (isCompanyFocus || (node.kind === "category" && node.categoryId === interaction.focusedCategoryId)) color.set(0xf0c967);
+        else if (companyDirectCategory) color.set(0x65d8d6);
+        else if (companyContextCategory) color.set(0x7695c9);
         else if (node.kind === "company") {
-          color.set(directCompany ? 0x73e5ef : 0x8dbdff);
+          if (interaction.focusedCompanyCode !== null) color.set(directCompany ? 0xf0c967 : 0x82aef2);
+          else color.copy(nodeColor(node)).lerp(new THREE.Color(directCompany ? 0xbfdcff : 0x93aeda), 0.22);
           if (interaction.displaySettings.showEvidenceHeat && node.evidenceCount > 0) {
             color.lerp(new THREE.Color(0x80e7c3), Math.min(0.18, node.evidenceCount * 0.04));
           }
+        } else if (node.kind === "entity" && node.profileRole) {
+          color.set(node.profileBranch === "upstream" ? 0x68d8c4
+            : node.profileBranch === "downstream" ? 0x72aef4
+              : node.profileBranch === "peer" ? 0xb68be7
+                : node.profileBranch === "organization" ? 0x83d9b9
+                  : 0xf0c967);
         } else if (node.kind === "evidence") {
           color.set(node.credibility === "高" ? 0xffd77a : node.credibility === "中" ? 0xd6b86d : 0xa98c58);
         } else color.lerp(new THREE.Color(0xdbe8ff), 0.08);
       }
       color.toArray(nodeColors, index * 3);
-      nodeSizes[index] = !renderable ? 0.01 : interaction.focusedCategoryId === null
+      nodeSizes[index] = !renderable ? 0.01 : !localFocus
         ? baseNodeSizes[index]
         : !focused
           ? 0.45
-          : node.kind === "category" && node.categoryId === interaction.focusedCategoryId
-            ? 16
+          : isCompanyFocus
+            ? 20.5
+            : node.kind === "category" && node.categoryId === interaction.focusedCategoryId
+              ? 13.8
             : node.kind === "category"
-              ? 10.6
+              ? companyContextCategory ? 5.6 : 10.2
               : node.kind === "evidence"
-                ? 2.8
+                ? 2.5
+                : node.kind === "entity" && node.profileRole === "hub"
+                  ? 11.2
+                  : node.kind === "entity" && node.profileRole === "member"
+                    ? 3.7
                 : directCompany
-                  ? 6.8
-                  : 5.4;
+                  ? 5.8
+                  : 4.8;
     });
     // Local nodes can pass close to the camera in the spherical layout. Capping
     // their screen size preserves depth without turning the foreground into discs.
-    nodeMaterial.uniforms.uMaxPoint.value = (localFocus ? 74 : 110) * renderer.getPixelRatio();
+    nodeMaterial.uniforms.uMaxPoint.value = (interaction.focusedCompanyCode !== null ? 118 : localFocus ? 82 : 110) * renderer.getPixelRatio();
     // Keep a restrained travelling signal visible as soon as a local orbit opens.
     // Its positions are derived from the same curve buffer as the line, avoiding
     // the visual drift caused by an independent particle path.
@@ -505,35 +667,83 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
     pulseHaloMaterial.size = localFocus ? 0.48 : 0.84;
     pulseMaterial.opacity = localFocus ? 0.68 : 0.62;
     pulseHaloMaterial.opacity = localFocus ? 0.045 : 0.055;
-    pulsePoints.visible = interaction.displaySettings.showLinks && pulseCountPerEdge > 0;
-    pulseHalos.visible = pulsePoints.visible;
     (nodeGeometry.getAttribute("aDim") as THREE.BufferAttribute).needsUpdate = true;
     (nodeGeometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
     (nodeGeometry.getAttribute("aSize") as THREE.BufferAttribute).needsUpdate = true;
+    const focusCompanyNodeId = interaction.focusedCompanyCode ? `company:${interaction.focusedCompanyCode}` : null;
+    const labelLimits: Record<EdgeSemanticKind, number> = {
+      upstream: 3,
+      downstream: 3,
+      core: 3,
+      organization: 2,
+      peer: 4,
+      category: 2,
+      neutral: 0,
+    };
+    const chosenLabelIds = new Set<string>();
+    if (focusCompanyNodeId) {
+      const candidatesBySemantic = new Map<EdgeSemanticKind, RenderEdge[]>();
+      renderEdges.forEach((item) => {
+        if (!edgeRenderable(item.edge)) return;
+        const directlyRelated = item.edge.source === focusCompanyNodeId
+          || item.edge.target === focusCompanyNodeId
+          || item.edge.id.startsWith("derived-peer:");
+        if (!directlyRelated) return;
+        const kind = edgeSemantic(item.edge).kind;
+        const rows = candidatesBySemantic.get(kind) ?? [];
+        rows.push(item);
+        candidatesBySemantic.set(kind, rows);
+      });
+      candidatesBySemantic.forEach((rows, kind) => {
+        rows
+          .sort((left, right) => {
+            const leftActive = path.size > 1 && path.has(left.edge.source) && path.has(left.edge.target) ? 1 : 0;
+            const rightActive = path.size > 1 && path.has(right.edge.source) && path.has(right.edge.target) ? 1 : 0;
+            return rightActive - leftActive
+              || edgeStrength(right.edge) - edgeStrength(left.edge)
+              || right.edge.evidenceCount - left.edge.evidenceCount
+              || left.edge.id.localeCompare(right.edge.id);
+          })
+          .slice(0, labelLimits[kind])
+          .forEach((item) => chosenLabelIds.add(item.edge.id));
+      });
+    }
+    syncEdgeLabels(chosenLabelIds);
+    activePulseEdgeIndexes = [];
+    activeRenderEdgePairs.fill(undefined);
     renderEdges.forEach((item, index) => {
       const activeEdge = path.size > 1 && path.has(item.edge.source) && path.has(item.edge.target);
       const visibleEdge = edgeRenderable(item.edge);
       const relationEndpoints = item.edge.kind === "relation" ? getRelationEndpoints(item.edge) : null;
-      const touchesFocus = interaction.focusedCategoryId !== null && relationEndpoints?.categoryId === interaction.focusedCategoryId;
+      const touchesFocus = (interaction.focusedCategoryId !== null && relationEndpoints?.categoryId === interaction.focusedCategoryId)
+        || (interaction.focusedCompanyCode !== null && (item.edge.source === `company:${interaction.focusedCompanyCode}` || item.edge.target === `company:${interaction.focusedCompanyCode}`));
       const signalGold = new THREE.Color(0xe9d89d);
+      const semanticColor = edgeSemanticColor(item.edge, item.color);
       const color = !visibleEdge
         ? new THREE.Color(0x000000)
         : activeEdge
-          ? item.color.clone().lerp(signalGold, 0.58)
+          ? semanticColor.clone().lerp(new THREE.Color(0xffffff), 0.34)
           : localFocus
-            ? item.color
-                .clone()
-                .lerp(signalGold, touchesFocus ? 0.42 : 0.2)
-                .multiplyScalar(touchesFocus ? 1 : 0.92)
+            ? semanticColor.clone().multiplyScalar(touchesFocus ? 1.06 : 0.86)
             : touchesFocus
               ? signalGold.clone().multiplyScalar(0.92)
               : item.color.clone().multiplyScalar(0.8);
       writeLinkColor(linkColors, index, linkK, color);
       writePulseColor(pulseColors, index, pulseCountPerEdge, color);
+      if (visibleEdge) {
+        activePulseEdgeIndexes.push(index);
+        activeRenderEdgePairs[index] = renderEdgePairs[index];
+      }
+      const edgeLabel = edgeLabelElements.get(item.edge.id);
+      if (edgeLabel) {
+        edgeLabel.classList.toggle("is-emphasized", activeEdge);
+      }
     });
+    pulsePoints.visible = localFocus && interaction.displaySettings.showLinks && pulseCountPerEdge > 0 && activePulseEdgeIndexes.length > 0;
+    pulseHalos.visible = pulsePoints.visible;
+    updateEdgeLabelPositions();
     (linkGeometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
     (pulseGeometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
-    updateHighlight();
     if (shouldReframe) {
       updateLayoutTarget();
       setCameraTarget();
@@ -674,11 +884,13 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
     });
   };
 
-  const targetFrameDuration = quality.tier === "full" ? 0 : quality.tier === "balanced" ? 1_000 / 45 : 1_000 / 30;
+  const idleFrameDuration = quality.tier === "full" ? 0 : quality.tier === "balanced" ? 1_000 / 45 : 1_000 / 30;
   const labelRenderStride = quality.tier === "full" ? 1 : quality.tier === "balanced" ? 2 : 3;
   const animate = (time = 0) => {
     animationFrame = requestAnimationFrame(animate);
     if (!visible || !intersecting) return;
+    const localTransition = layoutSettling && (interaction.focusedCategoryId !== null || interaction.focusedCompanyCode !== null);
+    const targetFrameDuration = localTransition ? 0 : idleFrameDuration;
     if (targetFrameDuration > 0 && time - lastRenderedAt < targetFrameDuration) return;
     lastRenderedAt = time;
     renderFrame += 1;
@@ -703,7 +915,8 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
         renderEdges,
         linkK,
         pulseCountPerEdge,
-        elapsed * (interaction.focusedCategoryId !== null ? 1.28 : 1),
+        elapsed * (interaction.focusedCategoryId !== null || interaction.focusedCompanyCode !== null ? 1.28 : 1),
+        activePulseEdgeIndexes,
       );
       (pulseGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
     }
@@ -715,22 +928,27 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
     graphDust.points.rotation.x = Math.sin(elapsed * 0.04) * 0.025;
     if (layoutSettling) {
       let largestMove = 0;
-      for (let index = 0; index < nodePositions.length; index += 1) {
-        const movement = (targetNodePositions[index] - nodePositions[index]) * 0.09;
-        nodePositions[index] += movement;
-        largestMove = Math.max(largestMove, Math.abs(movement));
+      const positionAlpha = 1 - Math.exp(-delta * 7.2);
+      for (const nodePositionIndex of activeLayoutNodeIndexes) {
+        const offset = nodePositionIndex * 3;
+        for (let axis = 0; axis < 3; axis += 1) {
+          const movement = (targetNodePositions[offset + axis] - nodePositions[offset + axis]) * positionAlpha;
+          nodePositions[offset + axis] += movement;
+          largestMove = Math.max(largestMove, Math.abs(movement));
+        }
       }
-      graphGroup.rotation.z += (targetGroupRotationZ - graphGroup.rotation.z) * 0.09;
+      graphGroup.rotation.z += (targetGroupRotationZ - graphGroup.rotation.z) * positionAlpha;
       (nodeGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
-      fillLinkPositions(linkPositions, nodePositions, renderEdges.map((item) => ({ source: item.sourceIndex, target: item.targetIndex })), linkK, interaction.focusedCategoryId === null ? 0.31 : 0.16);
+      fillLinkPositions(linkPositions, nodePositions, activeRenderEdgePairs, linkK, interaction.focusedCategoryId === null && interaction.focusedCompanyCode === null ? 0.31 : 0.16);
       (linkGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+      updateEdgeLabelPositions();
       nodes.forEach((node, index) => {
         const label = labelObjects.get(node.id);
         if (!label) return;
         label.position.set(nodePositions[index * 3], nodePositions[index * 3 + 1] + (node.kind === "category" ? 2.2 : 1.4), nodePositions[index * 3 + 2]);
       });
-      if (interaction.focusedCategoryId !== null) {
-        const focusIndex = nodeIndex.get(`category:${interaction.focusedCategoryId}`);
+      if (interaction.focusedCategoryId !== null || interaction.focusedCompanyCode !== null) {
+        const focusIndex = nodeIndex.get(interaction.focusedCompanyCode !== null ? `company:${interaction.focusedCompanyCode}` : `category:${interaction.focusedCategoryId}`);
         if (focusIndex !== undefined) {
           const x = nodePositions[focusIndex * 3];
           const y = nodePositions[focusIndex * 3 + 1];
@@ -739,20 +957,22 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
           focusOrbits.position.set(x, y, z);
         }
       }
-      if (renderFrame % 8 === 0 && (interaction.selectedNodeId || interaction.highlightedPathNodeIds.length > 1)) updateHighlight();
       if (largestMove < 0.012) {
         nodePositions.set(targetNodePositions);
         layoutSettling = false;
-        updateHighlight();
+        fillLinkPositions(linkPositions, nodePositions, activeRenderEdgePairs, linkK, interaction.focusedCategoryId === null && interaction.focusedCompanyCode === null ? 0.31 : 0.16);
+        (nodeGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+        (linkGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+        updateEdgeLabelPositions();
       }
     }
-    graphDust.material.opacity += ((interaction.focusedCategoryId === null ? 0.88 : 0.24) - graphDust.material.opacity) * 0.06;
+    graphDust.material.opacity += (((interaction.focusedCategoryId === null && interaction.focusedCompanyCode === null) ? 0.88 : 0.24) - graphDust.material.opacity) * 0.06;
     if (cameraFollowing) {
-      camera.position.lerp(targetCamera, 0.07);
-      controls.target.lerp(targetControl, 0.09);
+      camera.position.lerp(targetCamera, 1 - Math.exp(-delta * 4.4));
+      controls.target.lerp(targetControl, 1 - Math.exp(-delta * 5.7));
     }
     controls.update();
-    if (interaction.focusedCategoryId !== null && renderFrame % 3 === 0) {
+    if ((interaction.focusedCategoryId !== null || interaction.focusedCompanyCode !== null) && renderFrame % 3 === 0) {
       const depthSpan = Math.max(localVisibleRadius * 2.8, 90);
       labelObjects.forEach((label, nodeId) => {
         const element = labels.get(nodeId);
@@ -765,7 +985,7 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
       });
     }
     composer.render();
-    if (renderFrame % labelRenderStride === 0) {
+    if (layoutSettling || renderFrame % labelRenderStride === 0) {
       updateLabelCollisions();
       labelRenderer.render(scene, camera);
     }
@@ -774,7 +994,9 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
 
   return {
     setInteractionState(next) {
-      const focusChanged = interaction.focusedCategoryId !== next.focusedCategoryId;
+      const focusChanged = interaction.focusedCategoryId !== next.focusedCategoryId
+        || interaction.focusedCompanyCode !== next.focusedCompanyCode
+        || interaction.expandedCompanyBranch !== next.expandedCompanyBranch;
       interaction = next;
       applyState(focusChanged);
     },
@@ -800,8 +1022,6 @@ export function mountGalaxyRenderer(host: HTMLDivElement, graph: IndustryGraphPa
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       document.removeEventListener("visibilitychange", visibility);
       controls.dispose();
-      highlightGeometry?.dispose();
-      highlightMaterial?.dispose();
       resources.forEach((resource) => resource.dispose());
       disposeStarfield(stars.group);
       fieldStars.geometry.dispose();
@@ -840,16 +1060,6 @@ function buildRelationCategories(graph: IndustryGraphPayload) {
   return categories;
 }
 
-function writeEdge(positionBuffer: Float32Array, colorBuffer: Float32Array, edgeIndex: number, item: RenderEdge, nodePositions: Float32Array, color: THREE.Color) {
-  const sourceOffset = item.sourceIndex * 3;
-  const targetOffset = item.targetIndex * 3;
-  const offset = edgeIndex * 6;
-  positionBuffer.set(nodePositions.subarray(sourceOffset, sourceOffset + 3), offset);
-  positionBuffer.set(nodePositions.subarray(targetOffset, targetOffset + 3), offset + 3);
-  color.toArray(colorBuffer, offset);
-  color.toArray(colorBuffer, offset + 3);
-}
-
 function writeLinkColor(colorBuffer: Float32Array, edgeIndex: number, segments: number, color: THREE.Color) {
   const offset = edgeIndex * segments * 6;
   for (let segment = 0; segment < segments * 2; segment += 1) color.toArray(colorBuffer, offset + segment * 3);
@@ -859,9 +1069,17 @@ function writePulseColor(colorBuffer: Float32Array, edgeIndex: number, countPerE
   for (let pulse = 0; pulse < countPerEdge; pulse += 1) color.toArray(colorBuffer, (edgeIndex * countPerEdge + pulse) * 3);
 }
 
-function updatePulsePositions(linkPositions: Float32Array, pulsePositions: Float32Array, edges: RenderEdge[], segments: number, countPerEdge: number, elapsed: number) {
-  if (!countPerEdge) return;
-  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
+function updatePulsePositions(
+  linkPositions: Float32Array,
+  pulsePositions: Float32Array,
+  edges: RenderEdge[],
+  segments: number,
+  countPerEdge: number,
+  elapsed: number,
+  activeEdgeIndexes: number[],
+) {
+  if (!countPerEdge || !activeEdgeIndexes.length) return;
+  for (const edgeIndex of activeEdgeIndexes) {
     for (let pulse = 0; pulse < countPerEdge; pulse += 1) {
       const forwardProgress = (elapsed * (0.055 + (edgeIndex % 5) * 0.006) + edgeIndex * 0.173 + pulse / countPerEdge) % 1;
       const currentEdge = edges[edgeIndex]?.edge;
@@ -884,6 +1102,105 @@ function updatePulsePositions(linkPositions: Float32Array, pulsePositions: Float
       pulsePositions[output + 2] = THREE.MathUtils.lerp(linkPositions[source + 2] ?? 0, linkPositions[target + 2] ?? 0, mix);
     }
   }
+}
+
+type EdgeSemanticKind = "upstream" | "downstream" | "core" | "organization" | "peer" | "category" | "neutral";
+
+function edgeStrength(edge: IndustryGraphEdge) {
+  return "strength" in edge ? edge.strength ?? 0 : 0;
+}
+
+function edgeSemantic(edge: IndustryGraphEdge): { kind: EdgeSemanticKind; label: string } {
+  if (edge.id.startsWith("derived-peer:")) return { kind: "peer", label: "同业" };
+  if (edge.kind === "relation") return { kind: "category", label: "产业归属" };
+  if (edge.kind === "entityRelation") {
+    if (edge.relationType === "竞争关系") return { kind: "peer", label: "竞争" };
+    if (edge.direction === "inbound") return { kind: "upstream", label: "供应" };
+    if (edge.direction === "outbound") return { kind: "downstream", label: "客户" };
+    if (edge.relationType === "项目进展") return { kind: "organization", label: "组织" };
+    if (edge.relationType === "核心产品") return { kind: "core", label: "业务" };
+    if (edge.relationType === "技术关联") return { kind: "core", label: "技术" };
+    return { kind: "core", label: "业务" };
+  }
+  return { kind: "neutral", label: "关联" };
+}
+
+function edgeSemanticColor(edge: IndustryGraphEdge, fallback: THREE.Color) {
+  const semantic = edgeSemantic(edge).kind;
+  if (semantic === "upstream") return new THREE.Color(0x5fe0be);
+  if (semantic === "downstream") return new THREE.Color(0x6faeff);
+  if (semantic === "core") return new THREE.Color(0xf0c967);
+  if (semantic === "organization") return new THREE.Color(0x8fd8d0);
+  if (semantic === "peer") return new THREE.Color(0xc58bf3);
+  if (semantic === "category") return new THREE.Color(0xe9c86c);
+  return fallback.clone();
+}
+
+function edgePattern(edge: IndustryGraphEdge) {
+  const semantic = edgeSemantic(edge).kind;
+  if (semantic === "peer") return 2;
+  if (semantic === "organization") return 1;
+  return 0;
+}
+
+function buildDerivedPeerEdges(graph: IndustryGraphPayload): IndustryGraphEdge[] {
+  const memberships = new Map<string, Map<number, number>>();
+  const categoryMembers = new Map<number, string[]>();
+  graph.edges.forEach((edge) => {
+    if (edge.kind !== "relation") return;
+    const endpoints = getRelationEndpoints(edge);
+    if (!endpoints) return;
+    const rows = memberships.get(endpoints.companyNodeId) ?? new Map<number, number>();
+    rows.set(endpoints.categoryId, Math.max(rows.get(endpoints.categoryId) ?? 0, edge.evidenceCount));
+    memberships.set(endpoints.companyNodeId, rows);
+    const members = categoryMembers.get(endpoints.categoryId) ?? [];
+    if (!members.includes(endpoints.companyNodeId)) members.push(endpoints.companyNodeId);
+    categoryMembers.set(endpoints.categoryId, members);
+  });
+  const detailedCompanyIds = new Set(
+    graph.edges
+      .filter((edge) => edge.kind === "entityRelation" && !edge.id.startsWith("derived-peer:"))
+      .map((edge) => edge.source),
+  );
+  const companyIds = [...detailedCompanyIds]
+    .filter((companyId) => memberships.has(companyId))
+    .sort();
+  const edges: IndustryGraphEdge[] = [];
+  companyIds.forEach((source, sourceIndex) => {
+    const sourceCategories = memberships.get(source);
+    if (!sourceCategories?.size) return;
+    const candidateScores = new Map<string, number>();
+    sourceCategories.forEach((sourceEvidenceCount, categoryId) => {
+      (categoryMembers.get(categoryId) ?? []).forEach((target) => {
+        if (target === source) return;
+        const targetEvidenceCount = memberships.get(target)?.get(categoryId) ?? 0;
+        candidateScores.set(target, (candidateScores.get(target) ?? 0) + 100 + sourceEvidenceCount + targetEvidenceCount);
+      });
+    });
+    [...candidateScores.entries()].map(([target, score]) => ({ target, score }))
+      .sort((left, right) => right.score - left.score || left.target.localeCompare(right.target))
+      .slice(0, 4)
+      .forEach((candidate, index) => {
+        edges.push({
+          id: `derived-peer:${source}->${candidate.target}`,
+          source,
+          target: candidate.target,
+          kind: "entityRelation",
+          relationId: -(sourceIndex * 10 + index + 1),
+          relationType: "竞争关系",
+          confidence: "中",
+          evidenceCount: 0,
+          rationale: "由共同产业分类推导的同业关系，不代表客户或供应商关系。",
+          isWatchlist: false,
+          evidencePreviews: [],
+          direction: "undirected",
+          strength: 58,
+          observedAt: "",
+          verificationStatus: "unverified",
+        });
+      });
+  });
+  return edges;
 }
 
 function createHoverTitle(node: IndustryGraphNode) {
@@ -919,14 +1236,6 @@ function firstNonEmpty(...values: string[]) {
   const value = values.map((item) => item.trim()).find(Boolean) ?? "资料待补";
   const sentence = value.split(/[。！？]/).map((item) => item.trim()).find(Boolean) ?? value;
   return sentence.length > 78 ? `${sentence.slice(0, 78)}...` : sentence;
-}
-
-function labelPriority(node: IndustryGraphNode, degreeByNode: Map<string, number>) {
-  const degree = degreeByNode.get(node.id) ?? 0;
-  if (node.kind === "category") return 10_000 + degree * 10;
-  if (node.kind === "company") return 3_000 + node.evidenceCount * 20 + degree * 10;
-  if (node.kind === "entity") return 2_000 + node.evidenceCount * 20 + degree * 10;
-  return 1_000 + (node.credibility === "高" ? 200 : node.credibility === "中" ? 100 : 0) + degree * 10;
 }
 
 function visibleLabelPriority(element: HTMLElement | undefined, node: IndustryGraphNode | undefined) {
@@ -1007,6 +1316,17 @@ function buildFocusOrbits(resources: Array<THREE.BufferGeometry | THREE.Material
 function graphRadius(positions: Float32Array) {
   let radius = 12;
   for (let index = 0; index < positions.length; index += 3) radius = Math.max(radius, Math.hypot(positions[index] ?? 0, positions[index + 1] ?? 0, positions[index + 2] ?? 0));
+  return radius;
+}
+
+function graphRadiusForNodeIds(positions: Float32Array, nodeIndex: Map<string, number>, nodeIds: Set<string>) {
+  let radius = 12;
+  nodeIds.forEach((nodeId) => {
+    const index = nodeIndex.get(nodeId);
+    if (index === undefined) return;
+    const offset = index * 3;
+    radius = Math.max(radius, Math.hypot(positions[offset] ?? 0, positions[offset + 1] ?? 0, positions[offset + 2] ?? 0));
+  });
   return radius;
 }
 

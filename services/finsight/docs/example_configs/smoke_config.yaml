@@ -1,0 +1,37 @@
+target_name: "Apple Inc."
+stock_code: "AAPL"
+target_type: "financial_company"
+market: "US"
+output_dir: "./outputs/smoke"
+language: "zh"
+save_note: "local"
+
+reference_doc_path: "src/template/report_template.docx"
+outline_template_path: "src/template/smoke_outline_zh.md"
+
+custom_collect_tasks:
+  - "收集 Apple 的公司基本信息和最近五个交易日的股价数据，并保存数据来源"
+
+custom_analysis_tasks:
+  - "基于已采集数据概括 Apple 的主营业务，并计算最近五个交易日收盘价的区间变化"
+
+use_collect_data_cache: false
+use_analysis_cache: false
+use_report_outline_cache: false
+use_full_report_cache: false
+use_post_process_cache: false
+
+llm_config_list:
+  - model_name: "${DS_MODEL_NAME}"
+    api_key: "${DS_API_KEY}"
+    base_url: "${DS_BASE_URL}"
+    generation_params:
+      temperature: 0.2
+      max_tokens: 4096
+      top_p: 0.9
+  - model_name: "${EMBEDDING_MODEL_NAME}"
+    api_key: "${EMBEDDING_API_KEY}"
+    base_url: "${EMBEDDING_BASE_URL}"
+  - model_name: "${VLM_MODEL_NAME}"
+    api_key: "${VLM_API_KEY}"
+    base_url: "${VLM_BASE_URL}"

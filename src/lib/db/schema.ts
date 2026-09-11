@@ -213,9 +213,33 @@ export function migrate(db: Database.Database) {
       updated_at text not null default current_timestamp
     );
 
+    create table if not exists ai_research_sessions (
+      session_id text primary key,
+      title text not null,
+      target_type text not null check(target_type in ('company', 'industry', 'question')),
+      subject_key text not null,
+      subject_label text not null,
+      stock_code text references companies(stock_code) on delete set null,
+      category_id integer references categories(id) on delete set null,
+      depth text not null default 'standard',
+      skills_json text not null default '[]',
+      context_json text not null default '{}',
+      created_at text not null default current_timestamp,
+      updated_at text not null default current_timestamp
+    );
+
+    create table if not exists ai_research_messages (
+      id integer primary key autoincrement,
+      session_id text not null references ai_research_sessions(session_id) on delete cascade,
+      role text not null check(role in ('user', 'assistant')),
+      content text not null,
+      metadata_json text not null default '{}',
+      created_at text not null default current_timestamp
+    );
+
     create table if not exists research_documents (
       id integer primary key autoincrement,
-      report_type text not null check(report_type in ('company', 'industry', 'comparison', 'event')),
+      report_type text not null check(report_type in ('company', 'industry', 'macro', 'comparison', 'event', 'general')),
       subject_key text not null,
       subject_label text not null,
       stock_code text references companies(stock_code) on delete set null,
@@ -225,11 +249,13 @@ export function migrate(db: Database.Database) {
       executive_summary text not null default '',
       content text not null,
       model text not null default '',
+      engine text not null default 'native' check(engine in ('native', 'finsight')),
       status text not null default 'draft' check(status in ('draft', 'ready', 'needs_work')),
       current_version integer not null default 1,
       citations_json text not null default '[]',
       quality_json text not null default '{}',
       charts_json text not null default '[]',
+      artifacts_json text not null default '[]',
       created_at text not null default current_timestamp,
       updated_at text not null default current_timestamp
     );
@@ -315,6 +341,8 @@ export function migrate(db: Database.Database) {
     create index if not exists idx_ai_research_runs_stock on ai_research_runs(stock_code, created_at desc);
     create index if not exists idx_ai_research_reports_stock on ai_research_reports(stock_code, created_at desc);
     create index if not exists idx_universal_research_subject on universal_research_runs(subject_type, subject_key, id desc);
+    create index if not exists idx_ai_research_sessions_updated on ai_research_sessions(updated_at desc);
+    create index if not exists idx_ai_research_messages_session on ai_research_messages(session_id, id);
     create index if not exists idx_research_documents_subject on research_documents(report_type, subject_key, id desc);
     create index if not exists idx_research_documents_stock on research_documents(stock_code, id desc);
     create index if not exists idx_research_document_versions_report on research_document_versions(report_id, version_number desc);
@@ -336,11 +364,25 @@ export function migrate(db: Database.Database) {
   ensureColumn(db, "company_category_relations", "observed_at", "text not null default ''");
   ensureColumn(db, "company_category_relations", "verification_status", "text not null default 'unverified'");
   ensureColumn(db, "company_category_relations", "verified_at", "text not null default ''");
+  ensureColumn(db, "company_category_relations", "source", "text not null default 'manual'");
+  ensureColumn(db, "company_category_relations", "source_url", "text not null default ''");
+  ensureColumn(db, "company_category_relations", "synced_at", "text not null default ''");
+  ensureColumn(db, "categories", "taxonomy", "text not null default 'custom'");
+  ensureColumn(db, "categories", "external_code", "text not null default ''");
+  ensureColumn(db, "categories", "source_url", "text not null default ''");
+  ensureColumn(db, "categories", "synced_at", "text not null default ''");
+  ensureColumn(db, "companies", "market", "text not null default ''");
+  ensureColumn(db, "companies", "is_active", "integer not null default 1");
+  ensureColumn(db, "companies", "source", "text not null default 'manual'");
+  ensureColumn(db, "companies", "synced_at", "text not null default ''");
   ensureColumn(db, "evidences", "verification_status", "text not null default 'unverified'");
   ensureColumn(db, "evidences", "verified_at", "text not null default ''");
   ensureColumn(db, "company_source_snapshots", "last_success_facts_json", "text not null default '{}'");
   ensureColumn(db, "company_source_snapshots", "last_success_fetched_at", "text not null default ''");
   ensureColumn(db, "company_source_snapshots", "last_success_expires_at", "text not null default ''");
+  ensureColumn(db, "research_documents", "engine", "text not null default 'native'");
+  ensureColumn(db, "research_documents", "artifacts_json", "text not null default '[]'");
+  ensureResearchDocumentReportTypes(db);
   db.exec(`
     update company_source_snapshots
     set last_success_facts_json = facts_json,
@@ -362,6 +404,13 @@ export function migrate(db: Database.Database) {
     create unique index if not exists idx_sync_tasks_idempotency
       on sync_tasks(idempotency_key)
       where idempotency_key != '';
+    create unique index if not exists idx_categories_taxonomy_code
+      on categories(taxonomy, external_code)
+      where external_code != '';
+    create index if not exists idx_companies_market_active
+      on companies(market, is_active, stock_code);
+    create index if not exists idx_relations_source
+      on company_category_relations(source, stock_code);
   `);
 }
 
@@ -369,4 +418,57 @@ function ensureColumn(db: Database.Database, table: string, column: string, defi
   const columns = db.prepare(`pragma table_info(${table})`).all() as Array<{ name: string }>;
   if (columns.some((item) => item.name === column)) return;
   db.exec(`alter table ${table} add column ${column} ${definition}`);
+}
+
+function ensureResearchDocumentReportTypes(db: Database.Database) {
+  const table = db.prepare("select sql from sqlite_master where type = 'table' and name = 'research_documents'").get() as { sql?: string } | undefined;
+  if (!table?.sql || table.sql.includes("'macro'")) return;
+  const foreignKeysEnabled = Number(db.pragma("foreign_keys", { simple: true })) === 1;
+  if (foreignKeysEnabled) db.pragma("foreign_keys = OFF");
+  try {
+    db.exec(`
+      begin immediate;
+      create table research_documents_next (
+        id integer primary key autoincrement,
+        report_type text not null check(report_type in ('company', 'industry', 'macro', 'comparison', 'event', 'general')),
+        subject_key text not null,
+        subject_label text not null,
+        stock_code text references companies(stock_code) on delete set null,
+        category_id integer references categories(id) on delete set null,
+        comparison_codes text not null default '[]',
+        title text not null,
+        executive_summary text not null default '',
+        content text not null,
+        model text not null default '',
+        engine text not null default 'native' check(engine in ('native', 'finsight')),
+        status text not null default 'draft' check(status in ('draft', 'ready', 'needs_work')),
+        current_version integer not null default 1,
+        citations_json text not null default '[]',
+        quality_json text not null default '{}',
+        charts_json text not null default '[]',
+        artifacts_json text not null default '[]',
+        created_at text not null default current_timestamp,
+        updated_at text not null default current_timestamp
+      );
+      insert into research_documents_next (
+        id, report_type, subject_key, subject_label, stock_code, category_id, comparison_codes,
+        title, executive_summary, content, model, engine, status, current_version, citations_json,
+        quality_json, charts_json, artifacts_json, created_at, updated_at
+      ) select
+        id, report_type, subject_key, subject_label, stock_code, category_id, comparison_codes,
+        title, executive_summary, content, model, engine, status, current_version, citations_json,
+        quality_json, charts_json, artifacts_json, created_at, updated_at
+      from research_documents;
+      drop table research_documents;
+      alter table research_documents_next rename to research_documents;
+      commit;
+      create index if not exists idx_research_documents_subject on research_documents(report_type, subject_key, id desc);
+      create index if not exists idx_research_documents_stock on research_documents(stock_code, id desc);
+    `);
+  } catch (error) {
+    if (db.inTransaction) db.exec("rollback");
+    throw error;
+  } finally {
+    if (foreignKeysEnabled) db.pragma("foreign_keys = ON");
+  }
 }

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { chooseGraphQuality, createGraphLayout, type GraphPosition, type GraphQuality } from "@/lib/industry-graph/layout";
+import { chooseGraphQuality, createGraphLayout, getCompanyFocusedGraphNeighborhood, getFocusedGraphNeighborhood, type GraphPosition, type GraphQuality } from "@/lib/industry-graph/layout";
+import type { CompanyGraphBranch } from "@/lib/industry-graph/layout";
 import { getRelationEndpoints } from "@/lib/industry-graph/relations";
 import type { IndustryGraphDisplaySettings, IndustryGraphNode, IndustryGraphPayload, IndustryGraphSignalFilter } from "@/lib/industry-graph/types";
 import { mountGalaxyRenderer, type GalaxyRuntime } from "./GalaxyRenderer";
@@ -17,6 +18,8 @@ export type GalaxyViewController = Pick<GalaxyRuntime, "zoomBy" | "resetView" | 
 export type IndustryGraphSceneProps = {
   graph: IndustryGraphPayload;
   focusedCategoryId: number | null;
+  focusedCompanyCode: string | null;
+  expandedCompanyBranch: CompanyGraphBranch | null;
   selectedNodeId: string | null;
   highlightedPathNodeIds: string[];
   signalFilter: IndustryGraphSignalFilter;
@@ -27,17 +30,28 @@ export type IndustryGraphSceneProps = {
 };
 
 type GraphSceneRuntime = {
-  setInteractionState: (state: Pick<IndustryGraphSceneProps, "focusedCategoryId" | "selectedNodeId" | "highlightedPathNodeIds" | "signalFilter">) => void;
+  setInteractionState: (state: Pick<IndustryGraphSceneProps, "focusedCategoryId" | "focusedCompanyCode" | "expandedCompanyBranch" | "selectedNodeId" | "highlightedPathNodeIds" | "signalFilter">) => void;
   dispose: () => void;
 };
 
-export function IndustryGraphScene({ graph, focusedCategoryId, selectedNodeId, highlightedPathNodeIds, signalFilter, displaySettings, onSelectNode, onWebGlFailure, onRuntimeReady }: IndustryGraphSceneProps) {
+export function IndustryGraphScene({ graph, focusedCategoryId, focusedCompanyCode, expandedCompanyBranch, selectedNodeId, highlightedPathNodeIds, signalFilter, displaySettings, onSelectNode, onWebGlFailure, onRuntimeReady }: IndustryGraphSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<GalaxyRuntime | null>(null);
   const onSelectRef = useRef(onSelectNode);
   const onFailureRef = useRef(onWebGlFailure);
   onSelectRef.current = onSelectNode;
   onFailureRef.current = onWebGlFailure;
+  const accessibleNodes = useMemo(() => {
+    if (focusedCompanyCode !== null) {
+      const visibleNodeIds = getCompanyFocusedGraphNeighborhood(graph, focusedCompanyCode, expandedCompanyBranch).visibleNodeIds;
+      return graph.nodes.filter((node) => visibleNodeIds.has(node.id));
+    }
+    if (focusedCategoryId !== null) {
+      const visibleNodeIds = getFocusedGraphNeighborhood(graph, focusedCategoryId).visibleNodeIds;
+      return graph.nodes.filter((node) => visibleNodeIds.has(node.id));
+    }
+    return graph.nodes.filter((node) => node.kind === "category" && node.level <= 1);
+  }, [expandedCompanyBranch, focusedCategoryId, focusedCompanyCode, graph]);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -58,13 +72,13 @@ export function IndustryGraphScene({ graph, focusedCategoryId, selectedNodeId, h
   }, [graph, onRuntimeReady]);
 
   useEffect(() => {
-    runtimeRef.current?.setInteractionState({ focusedCategoryId, selectedNodeId, highlightedPathNodeIds, signalFilter, displaySettings });
-  }, [focusedCategoryId, selectedNodeId, highlightedPathNodeIds, signalFilter, displaySettings]);
+    runtimeRef.current?.setInteractionState({ focusedCategoryId, focusedCompanyCode, expandedCompanyBranch, selectedNodeId, highlightedPathNodeIds, signalFilter, displaySettings });
+  }, [focusedCategoryId, focusedCompanyCode, expandedCompanyBranch, selectedNodeId, highlightedPathNodeIds, signalFilter, displaySettings]);
 
   return (
     <div className="industry-graph-scene" ref={hostRef} data-testid="industry-graph-canvas-host">
       <div className="sr-only" data-testid="atlas-node-list" aria-label="图谱节点列表">
-        {graph.nodes.map((node) => (
+        {accessibleNodes.map((node) => (
           <button key={node.id} type="button" onClick={() => onSelectNode(node)}>{node.label}</button>
         ))}
       </div>

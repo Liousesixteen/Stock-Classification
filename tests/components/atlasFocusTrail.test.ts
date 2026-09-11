@@ -15,7 +15,10 @@ describe("AtlasFocusTrail", () => {
 
     expect(screen.getByLabelText("当前图谱聚焦路径")).toHaveTextContent("半导体");
     expect(screen.getByLabelText("当前图谱聚焦路径")).toHaveTextContent("封测");
+    expect(screen.queryByText("FOCUS MODE")).not.toBeInTheDocument();
+    expect(screen.queryByText("局部星图")).not.toBeInTheDocument();
     expect(screen.getByText("4 个环节")).toBeVisible();
+    expect(screen.getByText("封测").closest("span")).toHaveAttribute("aria-current", "page");
     fireEvent.click(screen.getByRole("button", { name: "返回上层" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });

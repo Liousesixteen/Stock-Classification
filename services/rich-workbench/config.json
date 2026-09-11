@@ -1,0 +1,71 @@
+{
+  "_说明": "Yidianx 市场工作台公共配置。保存后由服务热加载。",
+  "版本": "1.2.0",
+  "时区": "Asia/Shanghai",
+  "币种": "CNY",
+  "端口": 8765,
+  "监听地址": "0.0.0.0",
+  "访问控制": {
+    "启用": true,
+    "方式": "Basic Auth",
+    "凭据来源": "环境变量 RICH_USER / RICH_PASSWORD",
+    "无凭据时": "仅允许本机回环访问"
+  },
+  "默认视图": "stock",
+  "持仓模式": "fund_lookthrough",
+  "私有持仓文件": "private/portfolio.json",
+  "股票观察列表": [
+    {"name": "有研新材", "tencent": "sh600206", "group": "stock", "source": "用户提供的行情截图", "holding": false},
+    {"name": "士兰微", "tencent": "sh600460", "group": "stock", "source": "用户提供的行情截图", "holding": false},
+    {"name": "百合花", "tencent": "sh603823", "group": "stock", "source": "用户提供的行情截图", "holding": false}
+  ],
+  "宽基指数": [
+    {"name": "上证指数", "tencent": "sh000001", "group": "broad"},
+    {"name": "沪深300", "tencent": "sh000300", "group": "broad", "valuation": "SH000300"},
+    {"name": "创业板指", "tencent": "sz399006", "group": "broad"},
+    {"name": "上证50", "tencent": "sh000016", "group": "broad", "valuation": "SH000016"},
+    {"name": "中证500", "tencent": "sh000905", "group": "broad", "valuation": "SH000905"},
+    {"name": "科创50", "tencent": "sh000688", "group": "broad"},
+    {"name": "中证1000", "tencent": "sh000852", "group": "broad"}
+  ],
+  "行业板块": [
+    {"name": "半导体", "tencent": "sh512480", "group": "industry", "type": "industry"},
+    {"name": "AI算力", "tencent": "sh515000", "group": "industry", "type": "concept"},
+    {"name": "机器人", "tencent": "sh562500", "group": "industry", "type": "concept"},
+    {"name": "创新药", "tencent": "sh512170", "group": "industry", "type": "industry"},
+    {"name": "证券", "tencent": "sh512880", "group": "industry", "type": "industry"},
+    {"name": "电网设备", "tencent": "sh560580", "group": "industry", "type": "industry"}
+  ],
+  "全球大盘指数": [
+    {"name": "恒生指数", "tencent": "hkHSI", "group": "global", "region": "中国香港", "provider": "tencent"},
+    {"name": "纳斯达克100", "tencent": "usNDX", "group": "global", "region": "美国", "provider": "tencent"},
+    {"name": "日经225", "code": "emN225", "secid": "100.N225", "group": "global", "region": "日本", "provider": "eastmoney"},
+    {"name": "韩国KOSPI", "code": "emKS11", "secid": "100.KS11", "group": "global", "region": "韩国", "provider": "eastmoney"},
+    {"name": "英国富时100", "code": "emFTSE", "secid": "100.FTSE", "group": "global", "region": "欧洲", "provider": "eastmoney"}
+  ],
+  "条件观察指数": ["sh600206", "sh600460", "sh603823", "sh000300", "sz399006", "sh000905", "usNDX"],
+  "系统顶部观察指数": ["sh000300", "sz399006", "sh000905"],
+  "估值监测": {
+    "阈值": {"高估": 70, "偏高": 55, "低估": 30, "偏低": 45},
+    "宽基": [
+      {"name": "沪深300", "tencent": "sh000300", "valuation": "SH000300", "conf": "高"},
+      {"name": "上证50", "tencent": "sh000016", "valuation": "SH000016", "conf": "高"},
+      {"name": "中证500", "tencent": "sh000905", "valuation": "SH000905", "conf": "高"}
+    ],
+    "板块": [
+      {"name": "半导体", "tencent": "sh512480", "conf": "低"},
+      {"name": "创新药", "tencent": "sh512170", "conf": "低"}
+    ]
+  },
+  "新闻关键词": {
+    "利好": ["降准", "降息", "回购", "增持", "支持", "超预期"],
+    "利空": ["减持", "处罚", "调查", "亏损", "关税", "制裁", "退市"],
+    "重点": ["央行", "证监会", "美联储", "OpenAI", "两融", "纳斯达克"]
+  },
+  "刷新": {"行情秒": 15, "实时秒": 5, "资金流秒": 30, "新闻秒": 60, "K线秒": 300},
+  "缓存": {"完整包交易秒": 30, "完整包休市秒": 300, "硬过期秒": 1800},
+  "见顶信号": {
+    "手动项": {"巴菲特指标_GDP比": null, "融资余额_万亿": null, "散户新开户_万": null},
+    "维度权重": {"估值": 30, "情绪换手": 20, "技术动能": 20, "宽度结构": 20, "波动率": 10}
+  }
+}

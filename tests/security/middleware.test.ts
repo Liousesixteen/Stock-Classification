@@ -11,6 +11,13 @@ afterEach(() => {
 });
 
 describe("security middleware", () => {
+  it("allows the integrated workbench only as a same-origin iframe surface", () => {
+    const response = middleware(new NextRequest("http://localhost/rich-workbench/"));
+    expect(response.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+    expect(response.headers.get("content-security-policy")).toContain("frame-src 'self'");
+  });
+
   it("challenges protected routes when production credentials are configured", () => {
     process.env.STOCK_APP_BASIC_AUTH_USER = "analyst";
     process.env.STOCK_APP_BASIC_AUTH_PASSWORD = "secret";

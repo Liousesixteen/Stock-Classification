@@ -110,3 +110,38 @@ export function getCompany(db: Database.Database, stockCode: string) {
 
   return row ? mapRow(row) : undefined;
 }
+
+export function findStoredCompanyQuery(db: Database.Database, value: string) {
+  const query = value.trim().replace(/\s+/g, "");
+  if (!query) return undefined;
+  const row = db.prepare(
+    `
+      select stock_code, short_name, full_name, board, industry, region, market_cap_band, intro, main_business, updated_at
+      from companies
+      where stock_code = ? or short_name = ? or (full_name <> '' and full_name = ?)
+      order by case when stock_code = ? then 0 when short_name = ? then 1 else 2 end
+      limit 1
+    `,
+  ).get(query, query, query, query, query) as CompanyRow | undefined;
+  return row ? mapRow(row) : undefined;
+}
+
+export function findStoredCompanyMention(db: Database.Database, value: string) {
+  const text = value.trim().replace(/\s+/g, "");
+  if (!text) return undefined;
+  const rows = db.prepare(
+    `
+      select stock_code, short_name, full_name, board, industry, region, market_cap_band, intro, main_business, updated_at
+      from companies
+      where (length(short_name) >= 2 and instr(?, short_name) > 0)
+         or (length(full_name) >= 4 and instr(?, full_name) > 0)
+      order by max(length(short_name), length(full_name)) desc, stock_code asc
+      limit 2
+    `,
+  ).all(text, text) as CompanyRow[];
+  if (!rows[0]) return undefined;
+  const firstLength = Math.max(rows[0].short_name.length, rows[0].full_name.length);
+  const secondLength = rows[1] ? Math.max(rows[1].short_name.length, rows[1].full_name.length) : -1;
+  if (rows[1] && firstLength === secondLength && rows[0].stock_code !== rows[1].stock_code) return undefined;
+  return mapRow(rows[0]);
+}

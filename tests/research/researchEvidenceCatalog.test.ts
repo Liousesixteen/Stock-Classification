@@ -61,4 +61,31 @@ describe("research evidence catalog", () => {
       expect.objectContaining({ id: "graph-evidence:2", title: "来源公告" }),
     ]);
   });
+
+  it("uses the source publication date and readable metadata for market news", () => {
+    const catalog = buildResearchEvidenceCatalog(facts({
+      fieldFacts: [{
+        fieldKey: "marketNews:1",
+        status: "available",
+        provider: "DA-Stock · bocha",
+        sourceUrl: "https://example.com/market-news",
+        confidence: "medium",
+        verificationStatus: "unverified",
+        fetchedAt: "2026-08-12T09:00:00.000Z",
+        value: {
+          title: "监管机构发布市场通知",
+          summary: "通知包含可核验的市场安排。",
+          source: "监管网站",
+          sourceDate: "2026-08-11",
+        },
+      }],
+    }));
+
+    expect(catalog[0]).toMatchObject({
+      title: "监管机构发布市场通知",
+      sourceType: "监管网站",
+      sourceDate: "2026-08-11",
+      excerpt: "通知包含可核验的市场安排。",
+    });
+  });
 });

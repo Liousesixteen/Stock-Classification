@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { organizeStockFacts } from "@/lib/agents/classificationAgent";
 import type { StockLookupWithTrace } from "@/lib/datasources/stockLookup";
 import { migrate } from "@/lib/db/schema";
-import { runCompanyProfileSync } from "@/lib/research/companyProfileSync";
+import {
+  refreshCompanyProviderFacts,
+  runCompanyProfileSync,
+} from "@/lib/research/companyProfileSync";
 import { createCategory } from "@/lib/repositories/categories";
 import { upsertCompany } from "@/lib/repositories/companies";
 import { listCompanyFieldFacts } from "@/lib/repositories/companyFieldFacts";
@@ -12,6 +15,77 @@ import { listSourceSnapshots } from "@/lib/repositories/sourceSnapshots";
 import { createSyncTask, getSyncTaskById } from "@/lib/repositories/syncTasks";
 
 describe("company profile sync", () => {
+  it("refreshes provider facts for an existing company without requiring a relation task", async () => {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    upsertCompany(db, {
+      stockCode: "002156",
+      shortName: "通富微电",
+      fullName: "",
+      board: "深市主板",
+      industry: "半导体",
+      region: "",
+      marketCapBand: "",
+      intro: "",
+      mainBusiness: "",
+      updatedAt: "",
+    });
+    const lookupResult: StockLookupWithTrace = {
+      profile: {
+        stockCode: "002156",
+        shortName: "通富微电",
+        fullName: "通富微电子股份有限公司",
+        board: "深市主板",
+        industry: "半导体",
+        region: "江苏",
+        marketCapBand: "300-500亿",
+        intro: "集成电路封装测试企业。",
+        mainBusiness: "集成电路封装测试。",
+        businessScope: "",
+        businessReview: "",
+        concepts: ["先进封装"],
+        industryBlocks: ["半导体"],
+        mainProducts: ["集成电路封装测试"],
+        sourceFacts: ["行业：半导体"],
+        source: "eastmoney",
+        sourceDetail: "东方财富；腾讯财经",
+      },
+      traces: [{
+        provider: "tencent_quote",
+        providerLabel: "腾讯财经实时估值",
+        required: false,
+        status: "success",
+        facts: { price: 31.2, peTtm: 42.6, pb: 2.8 },
+        expectedFields: ["price", "peTtm", "pb"],
+        sourceUrl: "https://gu.qq.com/sz002156/gp",
+        confidence: "high",
+        cacheTtlMs: 600_000,
+        fetchedAt: "2026-07-28T10:00:00.000Z",
+        error: "",
+        durationMs: 80,
+      }],
+    };
+
+    const refreshed = await refreshCompanyProviderFacts(db, "002156", {
+      lookup: async () => lookupResult,
+      now: () => new Date("2026-07-28T10:00:00.000Z"),
+    });
+
+    expect(refreshed).toMatchObject({
+      successfulProviders: ["tencent_quote"],
+      partial: false,
+    });
+    expect(listCompanyFieldFacts(db, "002156")).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        fieldKey: "peTtm",
+        value: 42.6,
+        status: "available",
+        sourceUrl: "https://gu.qq.com/sz002156/gp",
+      }),
+    ]));
+  });
+
   it("persists provider facts at field level, including missing and failed fields", async () => {
     const db = new Database(":memory:");
     db.pragma("foreign_keys = ON");

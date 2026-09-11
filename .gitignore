@@ -14,7 +14,16 @@ build/
 *.sqlite-shm
 data/*.sqlite
 data/*.db
+**/data/*.db
+data/finsight-runs/
+data/finsight-runtime/
+data/da-stock/
 playwright-report/
 test-results/
 coverage/
 backups/
+cache/
+.rollback/
+__pycache__/
+*.py[cod]
+services/da-stock/.venv/

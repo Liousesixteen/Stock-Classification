@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# ── a-stock-data skill 启动器 ──
+# 确保所有 Python 执行都走项目的 .venv，不依赖系统 Python 或 PATH
+set -euo pipefail
+
+# 自动定位 skill 根目录（本脚本在 bin/ 下）
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$ROOT/.venv/bin/python"
+
+if [ ! -x "$PY" ]; then
+    echo "❌ 虚拟环境未找到: $PY" >&2
+    echo "   请先运行: make venv && make install" >&2
+    echo "   或手动:   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2
+    exit 2
+fi
+
+# 运行时环境校验（Python 侧二次确认）
+SKILL_CHECK=$("$PY" -c "
+import sys, os
+root = '${ROOT}'
+expected = os.path.join(root, '.venv')
+if not os.path.abspath(sys.executable).startswith(expected) and not os.environ.get('VIRTUAL_ENV', '').startswith(expected):
+    sys.stderr.write(f'❌ ERROR: 解释器不在 .venv 中\n  sys.executable = {sys.executable}\n  期望路径前缀 = {expected}\n  请通过 bin/run_skill 或 .venv/bin/python 运行\n')
+    sys.exit(3)
+print('✅ venv 校验通过:', sys.executable)
+" 2>&1) || { echo "$SKILL_CHECK" >&2; exit 3; }
+echo "$SKILL_CHECK" >&2
+
+# 执行传入的 Python 代码/脚本
+if [ $# -eq 0 ]; then
+    echo "用法: run_skill <python脚本路径或 -c '代码'>"
+    echo "示例: run_skill scripts/quote.py"
+    echo "      run_skill -c 'import mootdx; print(mootdx.__version__)'"
+    exit 1
+fi
+
+exec "$PY" "$@"

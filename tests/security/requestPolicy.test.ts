@@ -15,6 +15,7 @@ describe("request policy", () => {
       STOCK_RATE_LIMIT_READ_PER_MINUTE: "90",
     };
     expect(getRateLimitPolicy("/api/ai/research", "POST", env)).toMatchObject({ bucket: "ai", limit: 7 });
+    expect(getRateLimitPolicy("/api/ai/research/sessions", "GET", env)).toMatchObject({ bucket: "read", limit: 90 });
     expect(getRateLimitPolicy("/api/relations", "POST", env)).toMatchObject({ bucket: "write", limit: 30 });
     expect(getRateLimitPolicy("/api/workbench", "GET", env)).toMatchObject({ bucket: "read", limit: 90 });
   });

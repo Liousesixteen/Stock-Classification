@@ -676,7 +676,35 @@ export function seedSemiconductorData(db: Database.Database) {
   };
 
   const seed = db.transaction(() => {
-    ensureCategory(semiconductorTree, null, 0, 0);
+    const semiconductorRootId = ensureCategory(semiconductorTree, null, 0, 0);
+    const packagingCategory = findChildCategory.get("封测", semiconductorRootId) as { id: number } | undefined;
+    const packagingPeers: StockSeed[] = [
+      { stockCode: "600584", shortName: "长电科技", board: "沪市主板", industry: "半导体", region: "江苏", intro: "全球领先的集成电路成品制造与技术服务提供商。", mainBusiness: "芯片成品制造、先进封装与测试的一站式解决方案。", relationType: "主营业务", confidence: "高", rationale: "主营覆盖晶圆中测、封装、成品测试和先进封装技术平台。" },
+      { stockCode: "002156", shortName: "通富微电", board: "深市主板", industry: "半导体", region: "江苏", intro: "集成电路封装测试企业，覆盖先进封装与规模化制造。", mainBusiness: "集成电路封装测试。", relationType: "主营业务", confidence: "高", rationale: "主营业务直接属于封装测试环节。" },
+      { stockCode: "002185", shortName: "华天科技", board: "深市主板", industry: "半导体", region: "甘肃", intro: "国内集成电路封装测试企业，持续布局先进封装。", mainBusiness: "集成电路封装测试。", relationType: "主营业务", confidence: "高", rationale: "主营业务直接属于封装测试环节。" },
+      { stockCode: "600667", shortName: "太极实业", board: "沪市主板", industry: "半导体", region: "江苏", intro: "业务涉及半导体后工序服务与工程技术服务。", mainBusiness: "半导体后工序服务、工程技术服务等。", relationType: "重要相关", confidence: "中", rationale: "半导体后工序业务与封测产业链相关。" },
+      { stockCode: "688820", shortName: "盛合晶微", board: "科创板", industry: "半导体", region: "江苏", intro: "聚焦晶圆级先进封装与多芯片集成的封装测试企业。", mainBusiness: "晶圆级先进封装、测试与相关技术服务。", relationType: "主营业务", confidence: "高", rationale: "主营聚焦晶圆级先进封装与测试。" },
+    ];
+    if (packagingCategory) packagingPeers.forEach((stock) => {
+      insertCompany.run({
+        stockCode: stock.stockCode,
+        shortName: stock.shortName,
+        fullName: stock.fullName ?? "",
+        board: stock.board,
+        industry: stock.industry,
+        region: stock.region ?? "",
+        marketCapBand: stock.marketCapBand ?? "",
+        intro: stock.intro,
+        mainBusiness: stock.mainBusiness,
+      });
+      insertRelation.run({
+        stockCode: stock.stockCode,
+        categoryId: packagingCategory.id,
+        relationType: stock.relationType ?? "重要相关",
+        confidence: stock.confidence ?? "中",
+        rationale: stock.rationale,
+      });
+    });
     themeBoards.forEach((theme, index) => ensureCategory(theme, null, 0, index + 1));
     insertCompany.run({
       stockCode: "300346",
@@ -689,7 +717,80 @@ export function seedSemiconductorData(db: Database.Database) {
       intro: "国内先进电子材料平台型企业，产品覆盖光刻胶配套材料、电子特气和前驱体材料等领域。",
       mainBusiness: "从事先进前驱体材料、电子特气、光刻胶及配套材料等半导体电子材料的研发、生产和销售。",
     });
+    seedChangdianKnowledgeGraph(db);
   });
 
   seed();
+}
+
+function seedChangdianKnowledgeGraph(db: Database.Database) {
+  const companyExists = db.prepare("select 1 from companies where stock_code = '600584'").get();
+  if (!companyExists) return;
+  const relations = [
+    { entityType: "客户/供应商", entityName: "晶圆与芯片输入", entitySummary: "封测服务接收客户晶圆或芯片，进入晶圆中测、封装与成品测试流程。", relationType: "供应/采购", direction: "inbound", strength: 84, title: "长电科技 2025 年半年度报告：一站式芯片成品制造", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司提供从设计仿真、晶圆中测、封装到成品测试的一站式芯片成品制造解决方案。" },
+    { entityType: "客户/供应商", entityName: "封装基板与互连材料", entitySummary: "封装基板、引线框、凸块与互连材料构成先进封装关键工艺输入。", relationType: "供应/采购", direction: "inbound", strength: 76, title: "长电科技圆片级与扇出封装技术说明", url: "https://www.jcetglobal.com/site/TechInfo_2", excerpt: "公司晶圆级封装平台覆盖凸块、再分布层、硅通孔等关键互连工艺。" },
+    { entityType: "客户/供应商", entityName: "引线框 / 键合线 / 焊球", entitySummary: "支撑焊线、倒装和基板互连的关键封装材料输入。", relationType: "供应/采购", direction: "inbound", strength: 78, title: "长电科技焊线封装技术说明", url: "https://www.jcetglobal.com/site/wirebond-packaging", excerpt: "焊线封装支持引线框架、MIS 基板以及铝、金、银、铜等多类焊线。" },
+    { entityType: "客户/供应商", entityName: "塑封料 / 底填胶 / 热管理材料", entitySummary: "用于芯片保护、应力控制、底部填充和封装散热的材料输入。", relationType: "供应/采购", direction: "inbound", strength: 74, title: "长电科技全链路热管理方案", url: "https://www.jcetglobal.com/site/detailscon/2058", excerpt: "公司提供从芯片到系统的全链路热管理方案，覆盖高算力、汽车和功率器件应用。" },
+    { entityType: "客户/供应商", entityName: "封装与测试设备", entitySummary: "晶圆中测、封装组装、成品测试和可靠性验证所需设备体系。", relationType: "供应/采购", direction: "inbound", strength: 72, title: "长电科技 2025 年半年度报告：一站式芯片成品制造", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司服务覆盖晶圆中测、芯片及器件封装、成品测试和产品认证。" },
+    { entityType: "产品/技术", entityName: "XDFOI™ Chiplet", entitySummary: "覆盖 2D、2.5D、3D Chiplet 集成的高性能封装技术平台。", relationType: "核心产品", direction: "undirected", strength: 97, title: "长电科技：高算力时代高性能封装承载 IC 产业创新", url: "https://www.jcetglobal.com/site/detailscon/1857", excerpt: "XDFOI Chiplet 系列工艺覆盖 2D、2.5D、3D 集成技术并已实现稳定量产。" },
+    { entityType: "产品/技术", entityName: "WLP / 2.5D / 3D / SiP", entitySummary: "晶圆级封装、2.5D/3D、系统级封装等先进封装技术组合。", relationType: "核心产品", direction: "undirected", strength: 95, title: "长电科技圆片级与扇出封装技术说明", url: "https://www.jcetglobal.com/site/TechInfo_2", excerpt: "公司提供扇入、扇出、TSV 以及用于 2.5D 和 3D 集成的技术平台。" },
+    { entityType: "产品/技术", entityName: "设计仿真—晶圆中测—成品测试", entitySummary: "覆盖设计仿真、晶圆中测、封装、测试、认证及全球直运。", relationType: "技术关联", direction: "undirected", strength: 92, title: "长电科技 2025 年半年度报告：业务与技术", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司向全球客户提供全方位、一站式芯片成品制造解决方案。" },
+    { entityType: "产品/技术", entityName: "倒装芯片封装", entitySummary: "覆盖 FCBGA、fcCSP、fcLGA、fcPoP 等高密度互连封装。", relationType: "核心产品", direction: "undirected", strength: 93, title: "长电科技倒装封装技术", url: "https://www.jcetglobal.com/site/TechInfo/1317", excerpt: "倒装芯片互连具备高电气与热性能，产品组合覆盖大型单芯片到复杂先进 3D 封装。" },
+    { entityType: "产品/技术", entityName: "焊线与传统封装先进化", entitySummary: "覆盖 QFN、DFN、QFP、WB-BGA、WB-LGA 等成熟量产方案。", relationType: "核心产品", direction: "undirected", strength: 88, title: "长电科技焊线封装技术说明", url: "https://www.jcetglobal.com/site/wirebond-packaging", excerpt: "焊线封装覆盖多种封装类型，并拥有成熟稳定的大规模量产经验。" },
+    { entityType: "产品/技术", entityName: "微系统集成 / SiP", entitySummary: "通过协同设计和系统级封装实现多芯片、多器件高密度集成。", relationType: "核心产品", direction: "undirected", strength: 94, title: "长电科技 2025 年半年度报告：先进封装技术", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司拥有微系统集成、晶圆级封装、2.5D/3D 封装和系统级封装等技术。" },
+    { entityType: "产品/技术", entityName: "产品认证与全球直运", entitySummary: "从产品认证延伸至全球直运，形成端到端交付闭环。", relationType: "技术关联", direction: "undirected", strength: 85, title: "长电科技 2025 年半年度报告：一站式服务", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "一站式解决方案涵盖产品认证以及全球直运等服务。" },
+    { entityType: "客户/供应商", entityName: "AI 与高性能计算", entitySummary: "运算电子占 2025 年上半年收入 22.4%，覆盖 CPU、GPU、AI 加速器与高带宽存储。", relationType: "客户验证", direction: "outbound", strength: 94, title: "长电科技 XDFOI 高性能封装平台", url: "https://www.jcetglobal.com/site/detailscon/1857", excerpt: "平台应用场景覆盖 FPGA、CPU、GPU、AI 和 5G 网络芯片。" },
+    { entityType: "客户/供应商", entityName: "汽车电子", entitySummary: "汽车电子占 2025 年上半年收入 9.3%，覆盖功率、控制、传感和智能化芯片。", relationType: "客户验证", direction: "outbound", strength: 91, title: "长电科技 2025 年半年度报告：汽车电子业务", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "汽车电子业务延续增长，公司推进车规级先进封装解决方案。" },
+    { entityType: "客户/供应商", entityName: "存储与网络通信", entitySummary: "通讯电子占 2025 年上半年收入 38.1%，并覆盖高密度存储、网络通信与数据中心。", relationType: "客户验证", direction: "outbound", strength: 87, title: "长电科技 2025 年半年度报告：应用领域", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司技术广泛应用于高密度存储、网络通信等领域。" },
+    { entityType: "客户/供应商", entityName: "智能终端 / 工业医疗", entitySummary: "消费电子占 21.6%，工业及医疗电子占 8.6%，覆盖智能终端与工业控制。", relationType: "客户验证", direction: "outbound", strength: 82, title: "长电科技 2025 年半年度报告：应用领域", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司产品覆盖智能终端、工业及医疗电子等应用领域。" },
+    { entityType: "客户/供应商", entityName: "功率与能源", entitySummary: "面向功率器件、能源转换、数据中心电源及新能源汽车热管理应用。", relationType: "客户验证", direction: "outbound", strength: 84, title: "长电科技全链路热管理方案", url: "https://www.jcetglobal.com/site/detailscon/2058", excerpt: "公司方案面向高算力服务器、汽车功率模块与微型化功率器件。" },
+    { entityType: "项目/产能", entityName: "八大生产基地", entitySummary: "公司在中国、韩国和新加坡布局八大生产基地。", relationType: "项目进展", direction: "undirected", strength: 90, title: "长电科技 2025 年半年度报告：全球制造布局", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司在中国、韩国和新加坡设有八大生产基地。" },
+    { entityType: "项目/产能", entityName: "两大研发中心", entitySummary: "公司在中国和韩国布局两大研发中心，支撑先进封装研发。", relationType: "项目进展", direction: "undirected", strength: 89, title: "长电科技 2025 年半年度报告：研发体系", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司在中国和韩国设有两大研发中心。" },
+    { entityType: "项目/产能", entityName: "20+ 全球业务机构", entitySummary: "在全球设有 20 多个业务机构，提供贴近客户的技术合作与产业链支持。", relationType: "项目进展", direction: "undirected", strength: 86, title: "长电科技 2025 年半年度报告：全球业务网络", url: "https://www.jcetglobal.com/uploads/2025-08-20/50092556385059a0.pdf", excerpt: "公司在全球设有 20 多个业务机构，为客户提供技术合作与产业链支持。" },
+  ] as const;
+  const insertEntity = db.prepare(`
+    insert into research_graph_entities (entity_type, name, summary)
+    values (@entityType, @entityName, @entitySummary)
+    on conflict(entity_type, name) do update set summary = excluded.summary
+  `);
+  const findEntity = db.prepare("select id from research_graph_entities where entity_type = ? and name = ?");
+  const upsertRelation = db.prepare(`
+    insert into company_graph_entity_relations (
+      stock_code, entity_id, relation_type, confidence, rationale, direction, strength,
+      observed_at, verification_status, verified_at, is_watchlist
+    ) values ('600584', @entityId, @relationType, '高', @rationale, @direction, @strength,
+      '2025-08-20', 'verified', '2026-08-22', 0)
+    on conflict(stock_code, entity_id) do update set
+      relation_type = excluded.relation_type,
+      confidence = excluded.confidence,
+      rationale = excluded.rationale,
+      direction = excluded.direction,
+      strength = excluded.strength,
+      observed_at = excluded.observed_at,
+      verification_status = excluded.verification_status,
+      verified_at = excluded.verified_at
+  `);
+  const findRelation = db.prepare("select id from company_graph_entity_relations where stock_code = '600584' and entity_id = ?");
+  const insertEvidence = db.prepare(`
+    insert into company_graph_entity_evidences (
+      entity_relation_id, source_type, title, source_date, url, excerpt, credibility,
+      verification_status, verified_at
+    ) select @relationId, '公告', @title, '2025-08-20', @url, @excerpt, '高', 'verified', '2026-08-22'
+    where not exists (
+      select 1 from company_graph_entity_evidences where entity_relation_id = @relationId and title = @title
+    )
+  `);
+  for (const relation of relations) {
+    insertEntity.run(relation);
+    const entity = findEntity.get(relation.entityType, relation.entityName) as { id: number };
+    upsertRelation.run({
+      entityId: entity.id,
+      relationType: relation.relationType,
+      rationale: `${relation.entitySummary}（关系范围为产业链环节，不代表未披露的具体客户或供应商名单。）`,
+      direction: relation.direction,
+      strength: relation.strength,
+    });
+    const relationRow = findRelation.get(entity.id) as { id: number };
+    insertEvidence.run({ relationId: relationRow.id, title: relation.title, url: relation.url, excerpt: relation.excerpt });
+  }
 }

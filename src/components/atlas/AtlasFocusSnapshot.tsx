@@ -1,6 +1,7 @@
 "use client";
 
-import { Building2, ChevronRight, Layers3, Radar, Route, Sparkles } from "lucide-react";
+import { Building2, ChevronRight, Layers3, MousePointer2, Radar, Route, Sparkles } from "lucide-react";
+import React from "react";
 import { useMemo } from "react";
 import type { IndustryGraphPayload } from "@/lib/industry-graph/types";
 import { getRelationEndpoints } from "@/lib/industry-graph/relations";
@@ -13,11 +14,10 @@ export type AtlasFocusContext = {
   parentId: number | null;
 };
 
-export function AtlasFocusSnapshot({ graph, focus, onSelectCompany, onOpenSectorResearch }: {
+export function AtlasFocusSnapshot({ graph, focus, onSelectCompany }: {
   graph: IndustryGraphPayload;
   focus: AtlasFocusContext | null;
   onSelectCompany: (stockCode: string) => void;
-  onOpenSectorResearch: (categoryId: number) => void;
 }) {
   const companies = useMemo(() => {
     const categoryIds = focus ? collectCategoryIds(graph, focus.categoryId) : null;
@@ -38,11 +38,12 @@ export function AtlasFocusSnapshot({ graph, focus, onSelectCompany, onOpenSector
   const title = focus?.labels.at(-1) ?? "产业链全景";
 
   return (
-    <aside className="atlas-focus-snapshot" aria-label={`${title}研究焦点`}>
+    <aside className="atlas-focus-snapshot" aria-label={`${title}产业概览`}>
       <header>
-        <div><small>RESEARCH FOCUS</small><h2>{title}</h2></div>
+        <div><small>INDUSTRY NODE</small><h2>{title}</h2></div>
         <Radar aria-hidden="true" />
       </header>
+      {focus ? <div className="atlas-focus-path" aria-label="当前产业路径">{focus.labels.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div> : null}
       <p className="atlas-focus-summary">
         {focus ? `当前局部星系覆盖 ${focus.companyCount} 家相关公司，按产业关系与证据密度组织。` : "从全景进入产业节点，查看局部环节、关联公司与证据路径。"}
       </p>
@@ -52,12 +53,12 @@ export function AtlasFocusSnapshot({ graph, focus, onSelectCompany, onOpenSector
         <div><Route aria-hidden="true" /><b>{focus ? evidenceCount : graph.stats.evidenceCount}</b><span>有效证据</span></div>
       </div>
       <section>
-        <div className="atlas-focus-section-title"><Sparkles aria-hidden="true" /><span>优先观察</span></div>
+        <div className="atlas-focus-section-title"><Sparkles aria-hidden="true" /><span>关联公司</span><small>按证据优先 · {companies.length} 家</small></div>
         <div className="atlas-focus-company-list">
           {companies.length > 0 ? companies.map(({ company, edge }) => (
               <button key={company.stockCode} type="button" onClick={() => onSelectCompany(company.stockCode)}>
                 <span><b>{company.label}</b><small>{company.stockCode} · {edge.relationType}</small></span>
-                <em>{edge.evidenceCount || "待证"}</em>
+                <em className={edge.evidenceCount > 0 ? "is-evidenced" : "is-pending"}>{edge.evidenceCount > 0 ? `${edge.evidenceCount} 证据` : "待核验"}</em>
                 <ChevronRight aria-hidden="true" />
               </button>
             )) : (
@@ -69,7 +70,8 @@ export function AtlasFocusSnapshot({ graph, focus, onSelectCompany, onOpenSector
             )}
         </div>
       </section>
-      {focus ? <button className="atlas-focus-sector-action" type="button" onClick={() => onOpenSectorResearch(focus.categoryId)}>进入赛道研究<ChevronRight aria-hidden="true" /></button> : null}
+      <div className="atlas-focus-hint"><MousePointer2 aria-hidden="true" /><span><b>查看公司星图</b><small>点击上方公司，展开业务、上下游与竞争关系</small></span></div>
+      {/* LEGACY（按产品要求隐藏）：原“进入赛道研究”主操作。 */}
     </aside>
   );
 }

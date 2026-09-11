@@ -24,6 +24,7 @@ export const AGGREGATED_PROFILE_PROVIDER = "aggregated_profile";
 
 const AGGREGATED_PROFILE_CACHE_MS = 10 * 60 * 1000;
 const FAILURE_CACHE_MS = 30 * 60 * 1000;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 10_000;
 
 type SyncInput = {
   stockCode: string;
@@ -36,6 +37,11 @@ type SyncDependencies = {
   db?: Database.Database;
   lookup?: typeof lookupStockProfileWithTrace;
   organize?: typeof organizeStockFactsWithConfiguredAgent;
+  now?: () => Date;
+};
+
+type ProviderRefreshDependencies = {
+  lookup?: typeof lookupStockProfileWithTrace;
   now?: () => Date;
 };
 
@@ -118,6 +124,53 @@ export async function runCompanyProfileSync(input: SyncInput, dependencies: Sync
   }
 }
 
+export async function refreshCompanyProviderFacts(
+  db: Database.Database,
+  stockCode: string,
+  dependencies: ProviderRefreshDependencies = {},
+) {
+  const lookup = dependencies.lookup ?? lookupStockProfileWithTrace;
+  const now = dependencies.now ?? (() => new Date());
+  const result = await lookup(stockCode, undefined, {
+    providerTimeoutMs: companyProviderTimeoutMs(),
+  });
+  persistLookupSnapshots(db, result, now());
+
+  const existing = getCompany(db, stockCode);
+  upsertCompany(db, {
+    stockCode,
+    shortName: firstText(result.profile.shortName, existing?.shortName, stockCode),
+    fullName: firstText(result.profile.fullName, existing?.fullName),
+    board: firstText(result.profile.board, existing?.board),
+    industry: firstText(result.profile.industry, existing?.industry),
+    region: firstText(result.profile.region, existing?.region),
+    marketCapBand: firstText(result.profile.marketCapBand, existing?.marketCapBand),
+    intro: firstText(result.profile.intro, existing?.intro),
+    mainBusiness: firstText(
+      result.profile.mainBusiness,
+      result.profile.businessScope,
+      existing?.mainBusiness,
+    ),
+    updatedAt: "",
+  });
+
+  const successfulProviders = result.traces
+    .filter((trace) => trace.status === "success")
+    .map((trace) => trace.provider);
+  const failedProviders = result.traces
+    .filter((trace) => trace.status === "failed")
+    .map((trace) => trace.provider);
+  const skippedProviders = result.traces
+    .filter((trace) => trace.status === "skipped")
+    .map((trace) => trace.provider);
+  return {
+    successfulProviders,
+    failedProviders,
+    skippedProviders,
+    partial: failedProviders.length > 0 || successfulProviders.length === 0,
+  };
+}
+
 function selectTargetRelations(db: Database.Database, stockCode: string, categoryId?: number) {
   const relations = listRelationsForCompany(db, stockCode);
   return categoryId === undefined ? relations : relations.filter((relation) => relation.categoryId === categoryId);
@@ -150,15 +203,21 @@ async function resolveProfile(input: {
   }
 
   try {
-    const result = await input.lookup(input.stockCode, undefined, { providerTimeoutMs: 3_500 });
+    const result = await input.lookup(input.stockCode, undefined, {
+      providerTimeoutMs: companyProviderTimeoutMs(),
+    });
     persistLookupSnapshots(input.db, result, input.now());
     return {
       profile: result.profile,
       fromCache: false,
-      partial: result.traces.some((trace) => trace.status === "failed"),
-      failedProviders: result.traces
-        .filter((trace) => trace.status === "failed")
-        .map((trace) => trace.provider),
+      partial:
+        result.traces.some((trace) => trace.status === "failed")
+        || !result.traces.some((trace) => trace.status === "success"),
+      failedProviders: result.traces.some((trace) => trace.status === "success")
+        ? result.traces
+          .filter((trace) => trace.status === "failed")
+          .map((trace) => trace.provider)
+        : ["未启用或未成功连接任何外部数据源"],
     };
   } catch (error) {
     const fallback = buildFallbackProfile(input.stockCode, input.existingCompany);
@@ -332,4 +391,10 @@ function firstText(...values: Array<string | undefined>) {
 
 function toSqliteTimestamp(value: Date) {
   return value.toISOString().replace("T", " ").slice(0, 19);
+}
+
+function companyProviderTimeoutMs() {
+  const configured = Number(process.env.STOCK_PROFILE_PROVIDER_TIMEOUT_MS);
+  if (!Number.isFinite(configured)) return DEFAULT_PROVIDER_TIMEOUT_MS;
+  return Math.min(15_000, Math.max(1_000, Math.round(configured)));
 }

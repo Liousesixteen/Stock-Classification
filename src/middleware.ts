@@ -14,7 +14,7 @@ let requestCount = 0;
 export function middleware(request: NextRequest) {
   const requestId = request.headers.get("x-request-id")?.slice(0, 96) || crypto.randomUUID();
   const authFailure = authorize(request);
-  if (authFailure) return withSecurityHeaders(authFailure, requestId);
+  if (authFailure) return withSecurityHeaders(authFailure, requestId, request.nextUrl.pathname);
 
   if (request.nextUrl.pathname.startsWith("/api/")) {
     const contentLength = Number(request.headers.get("content-length") ?? 0);
@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
       return withSecurityHeaders(NextResponse.json(
         { error: "请求正文超过允许大小", requestId },
         { status: 413 },
-      ), requestId);
+      ), requestId, request.nextUrl.pathname);
     }
     const policy = getRateLimitPolicy(request.nextUrl.pathname, request.method);
     const client = clientIdentifier(request);
@@ -41,7 +41,7 @@ export function middleware(request: NextRequest) {
             "X-RateLimit-Reset": String(Math.ceil(result.resetAt / 1_000)),
           },
         },
-      ), requestId);
+      ), requestId, request.nextUrl.pathname);
     }
   }
 
@@ -50,7 +50,7 @@ export function middleware(request: NextRequest) {
   const username = configuredUsername();
   if (username) requestHeaders.set("x-authenticated-user", username);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  return withSecurityHeaders(response, requestId);
+  return withSecurityHeaders(response, requestId, request.nextUrl.pathname);
 }
 
 export const config = {
@@ -92,16 +92,17 @@ function pruneRateLimits() {
   }
 }
 
-function withSecurityHeaders(response: NextResponse, requestId: string) {
+function withSecurityHeaders(response: NextResponse, requestId: string, pathname: string) {
+  const richWorkbench = pathname === "/rich-workbench" || pathname.startsWith("/rich-workbench/");
   response.headers.set("X-Request-Id", requestId);
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Frame-Options", richWorkbench ? "SAMEORIGIN" : "DENY");
   response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
   const developmentEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
   response.headers.set(
     "Content-Security-Policy",
-    `default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'${developmentEval}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'`,
+    `default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors ${richWorkbench ? "'self'" : "'none'"}; frame-src 'self'; object-src 'none'; script-src 'self' 'unsafe-inline'${developmentEval}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'`,
   );
   if (process.env.NODE_ENV === "production" && process.env.STOCK_FORCE_HTTPS === "true") {
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");

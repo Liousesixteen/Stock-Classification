@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "A 股产业链分类工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Yidianx" })).toBeVisible();
 });
 
 test("opens the research dashboard and exposes the primary workflow", async ({ page }) => {
@@ -98,19 +98,15 @@ test("opens a persistent task at its exact company dossier target", async ({ pag
 test("opens the universal AI research and report writing workspaces", async ({ page }) => {
   const primaryNav = page.getByLabel("研究空间导航");
 
-  await page.getByRole("button", { name: "AI 研究" }).click();
-  await expect(page.getByLabel("AI 研究工作空间")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI 研究" })).toBeVisible();
+  await page.getByRole("button", { name: "AI研判" }).click();
+  await expect(page.getByLabel("AI研判工作空间")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI研判" })).toBeVisible();
   await expect(page.getByRole("button", { name: "快速问答" })).toBeVisible();
   await expect(page.getByRole("button", { name: "标准研究" })).toBeVisible();
   await expect(page.getByRole("button", { name: "深度研究" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "数据分析" })).toBeDisabled();
   await expect(page.getByText("运行后显示真实引用")).toBeVisible();
 
-  const targetInput = page.getByPlaceholder("输入公司代码或名称");
-  await targetInput.fill("半导体");
-  await targetInput.press("Enter");
-  await expect(page.locator(".ai-assistant-message header small")).toContainText("产业档案");
+  await expect(page.getByPlaceholder("输入公司代码或名称")).toHaveCount(0);
 
   await primaryNav.getByRole("button", { name: "研究工作台" }).click();
   await page.getByRole("button", { name: "报告工坊" }).click();
@@ -133,7 +129,31 @@ test("keeps the four report workflows usable on a narrow desktop", async ({ page
   await expect(studio.getByRole("button", { name: /赛道研究/ })).toBeVisible();
   await expect(studio.getByRole("button", { name: /公司对比/ })).toBeVisible();
   await expect(studio.getByRole("button", { name: /事件点评/ })).toBeVisible();
+  await expect(studio.getByRole("button", { name: /证据约束/ })).toBeVisible();
+  const narrowResearchEngine = studio.getByRole("button", { name: /星图多智能体/ });
+  await expect(narrowResearchEngine).toBeVisible();
+  await expect(narrowResearchEngine).not.toContainText("正在检测运行环境");
+  await expect(studio.locator(".report-engine-picker")).toBeInViewport();
   await expect(studio.getByText("Markdown 章节编辑")).toBeVisible();
+  if (process.env.CAPTURE_REPORT_WORKSHOP === "1") {
+    await studio.screenshot({ path: "test-results/report-workshop-finsight.png" });
+  }
+});
+
+test("lays out the multi-agent report engine on a wide desktop", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.getByRole("button", { name: "报告工坊" }).click();
+  const studio = page.getByLabel("研报写作工作台");
+  await expect(studio.getByRole("button", { name: /证据约束/ })).toBeVisible();
+  const researchEngine = studio.getByRole("button", { name: /星图多智能体/ });
+  await expect(researchEngine).toBeVisible();
+  await expect(researchEngine).not.toContainText("正在检测运行环境");
+  await expect(studio.locator(".report-studio-history")).toBeVisible();
+  await expect(studio.locator(".report-studio-editor")).toBeVisible();
+  await expect(studio.locator(".report-studio-quality")).toBeVisible();
+  if (process.env.CAPTURE_REPORT_WORKSHOP === "1") {
+    await studio.screenshot({ path: "test-results/report-workshop-finsight-wide.png" });
+  }
 });
 
 test("focuses the semiconductor chain and opens a company from the atlas", async ({ page }) => {
@@ -178,6 +198,26 @@ test("focuses a detailed semiconductor node from the atlas search", async ({ pag
   await expect(focusSnapshot).toBeVisible();
   await expect(focusSnapshot).toContainText("封测");
   await expect(focusSnapshot).toContainText("关联公司");
+});
+
+test("opens the Changdian company knowledge orbit with evidence-backed relationship groups", async ({ page }) => {
+  await page.getByLabel("研究空间导航").getByRole("button", { name: "产业链图谱" }).click();
+  const finder = page.getByRole("textbox", { name: "定位产业或公司" });
+  await finder.fill("长电科技");
+  await page.getByRole("option", { name: /长电科技/ }).click();
+
+  await expect(page.getByLabel("当前图谱聚焦路径")).toContainText("长电科技");
+  await expect(page.getByLabel("当前图谱聚焦路径")).toContainText("5 类关系");
+  const snapshot = page.getByTestId("atlas-company-snapshot");
+  await expect(snapshot).toContainText("COMPANY KNOWLEDGE GRAPH");
+  await expect(snapshot).toContainText("11");
+  await snapshot.getByRole("button", { name: "产业关系" }).click();
+  await expect(snapshot).toContainText("XDFOI™ Chiplet");
+  await expect(snapshot).toContainText("AI 与高性能计算");
+  await expect(snapshot).toContainText("封装基板与互连材料");
+  await snapshot.getByRole("button", { name: /XDFOI™ Chiplet/ }).click();
+  await expect(page.locator(".atlas-entity-snapshot")).toContainText("XDFOI™ Chiplet");
+  await expect(page.getByLabel("当前图谱聚焦路径")).toContainText("长电科技");
 });
 
 test("keeps atlas hover, drag, and zoom interactions stable", async ({ page }) => {

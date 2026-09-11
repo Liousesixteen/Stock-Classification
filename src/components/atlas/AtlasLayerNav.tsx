@@ -8,11 +8,17 @@ import { AtlasSignalFilter } from "./AtlasSignalFilter";
 type DisplayKey = keyof IndustryGraphDisplaySettings;
 
 const layerRows: Array<{ key: DisplayKey; label: string; icon: typeof Building2 }> = [
-  { key: "showCompanies", label: "显示公司节点", icon: Building2 },
-  { key: "showCategories", label: "显示产业节点", icon: Layers3 },
-  { key: "showLinks", label: "显示关系连线", icon: GitBranch },
-  { key: "showEvidenceHeat", label: "显示证据节点", icon: FileCheck2 },
+  { key: "showCompanies", label: "公司", icon: Building2 },
+  { key: "showCategories", label: "产业", icon: Layers3 },
+  { key: "showLinks", label: "连线", icon: GitBranch },
+  { key: "showEvidenceHeat", label: "证据", icon: FileCheck2 },
 ];
+
+// The global atlas finder and relationship selector now live in the single
+// consolidated toolbar. Keep these switches so the former local controls can
+// be restored without reconstructing their behavior.
+const showLegacyCategorySearch = false;
+const showLegacySignalFilter = false;
 
 export function AtlasLayerNav({ nodes, selectedCategoryId, signalFilter, displaySettings, onSelect, onSignalFilterChange, onDisplaySettingsChange, onManageCategories }: {
   nodes: IndustryGraphNode[];
@@ -29,18 +35,14 @@ export function AtlasLayerNav({ nodes, selectedCategoryId, signalFilter, display
   const categories = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     return allCategories
-      .filter((node) => node.level <= 1 && (!normalized || node.label.toLocaleLowerCase().includes(normalized)))
+      .filter((node) => (normalized ? node.label.toLocaleLowerCase().includes(normalized) : node.level <= 1))
       .sort((left, right) => left.level - right.level || left.categoryId - right.categoryId);
   }, [allCategories, query]);
 
   return (
     <aside className="atlas-layer-nav" data-testid="atlas-layer-nav">
-      <div className="atlas-panel-heading"><div><span>图谱图层</span><small>GRAPH LAYERS</small></div><button type="button" title="重置图层" onClick={() => onDisplaySettingsChange({ showCompanies: true, showCategories: true, showLinks: true, showEvidenceHeat: true })}><RotateCcw aria-hidden="true" />重置</button></div>
-      <div className="atlas-layer-switches">
-        {layerRows.map(({ key, label, icon: Icon }) => <button key={key} type="button" role="switch" aria-checked={displaySettings[key]} onClick={() => onDisplaySettingsChange({ ...displaySettings, [key]: !displaySettings[key] })}><Icon aria-hidden="true" /><span>{label}</span><i className={displaySettings[key] ? "is-on" : ""} /></button>)}
-      </div>
-
-      <div className="atlas-category-heading"><div><span>产业链分类</span><small>{allCategories.length}</small></div><label><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索分类" aria-label="搜索产业链分类" /></label></div>
+      <div className="atlas-panel-heading"><div><span>产业链分类</span><small>INDUSTRY TAXONOMY</small></div><button type="button" title="重置显示设置" onClick={() => onDisplaySettingsChange({ showCompanies: true, showCategories: true, showLinks: true, showEvidenceHeat: true })}><RotateCcw aria-hidden="true" />重置</button></div>
+      <div className="atlas-category-heading"><div><span>分层目录</span><small>{allCategories.length}</small></div>{showLegacyCategorySearch ? <label><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索行业或产业环节" aria-label="搜索产业链分类" /></label> : <p>使用上方全局搜索定位分类</p>}</div>
       <div className="atlas-category-list">
         <button className={selectedCategoryId === null ? "is-active" : ""} type="button" onClick={() => onSelect(null)}><i /><span>全部节点</span><b>{nodes.length}</b></button>
         {categories.map((node) => (
@@ -51,7 +53,13 @@ export function AtlasLayerNav({ nodes, selectedCategoryId, signalFilter, display
           </button>
         ))}
       </div>
-      <AtlasSignalFilter value={signalFilter} onChange={onSignalFilterChange} />
+      <div className="atlas-display-tools" aria-label="图谱显示设置">
+        <div><span>显示内容</span><small>VIEW LAYERS</small></div>
+        <div className="atlas-layer-switches">
+          {layerRows.map(({ key, label, icon: Icon }) => <button key={key} type="button" role="switch" aria-checked={displaySettings[key]} className={displaySettings[key] ? "is-active" : ""} onClick={() => onDisplaySettingsChange({ ...displaySettings, [key]: !displaySettings[key] })}><Icon aria-hidden="true" /><span>{label}</span><i className={displaySettings[key] ? "is-on" : ""} /></button>)}
+        </div>
+      </div>
+      {showLegacySignalFilter ? <AtlasSignalFilter value={signalFilter} onChange={onSignalFilterChange} /> : null}
       <button className="atlas-custom-category-button" type="button" onClick={onManageCategories}>
         <Settings2 aria-hidden="true" />
         <span>自定义分类</span>

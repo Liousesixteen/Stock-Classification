@@ -1,16 +1,23 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { CheckCircle2, ChevronDown, ShieldCheck, X } from "lucide-react";
+import { Orbit } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SectorResearch } from "@/components/sector/SectorResearch";
-import { ResearchQueue } from "@/components/queue/ResearchQueue";
+import { ResearchQueueDrawer } from "@/components/queue/ResearchQueue";
 import type { WorkbenchMode } from "./types";
 import { WorkbenchModeSwitch } from "./WorkbenchModeSwitch";
-import { GlobalMarketTicker } from "./GlobalMarketTicker";
-import { ResearchWorkbench } from "./ResearchWorkbench";
-import { ResearchResultsLibrary } from "./ResearchResultsLibrary";
-import type { ResearchQueueItem } from "@/lib/repositories/researchQueue";
+import { AccountWorkspace } from "./AccountWorkspace";
+import type { AccountSection } from "./AccountWorkspace";
+import { WorkspaceAccountActions } from "./WorkspaceAccountActions";
+import { RichWorkbenchWorkspace } from "./RichWorkbenchWorkspace";
+import { ResearchIntelligenceDock } from "./ResearchIntelligenceDock";
+import type { ResearchQueue } from "@/lib/repositories/researchQueue";
+
+// LEGACY WORKSPACES（按产品要求注释保留，不删除源码）：
+// import { SectorResearch } from "@/components/sector/SectorResearch";
+// import { ResearchWorkbench } from "./ResearchWorkbench";
+// import { ResearchResultsLibrary } from "./ResearchResultsLibrary";
+// import { GlobalMarketTicker } from "./GlobalMarketTicker";
 
 const IndustryAtlas = dynamic(() => import("@/components/atlas/IndustryAtlas").then((module) => module.IndustryAtlas), {
   ssr: false,
@@ -19,15 +26,13 @@ const IndustryAtlas = dynamic(() => import("@/components/atlas/IndustryAtlas").t
 
 export function Workbench() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [sectorCategoryId, setSectorCategoryId] = useState<number | null>(null);
   const [selectedStockCode, setSelectedStockCode] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [mode, setMode] = useState<WorkbenchMode>("research");
-  const [researchHomeKey, setResearchHomeKey] = useState(0);
+  const [mode, setMode] = useState<WorkbenchMode>("atlas");
   const [pendingCompanySelection, setPendingCompanySelection] = useState<{ stockCode: string; categoryId: number | null } | null>(null);
-  const [researchFocusTask, setResearchFocusTask] = useState<ResearchQueueItem | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [runtimeStatus, setRuntimeStatus] = useState<{ deepseekConfigured: boolean; model: string; profileProvidersEnabled: boolean } | null>(null);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [queueSummary, setQueueSummary] = useState({ attention: 0, running: 0 });
+  const [accountSection, setAccountSection] = useState<AccountSection>("profile");
 
   useEffect(() => {
     setSelectedStockCode(null);
@@ -40,15 +45,23 @@ export function Workbench() {
   }, [pendingCompanySelection, selectedCategoryId]);
 
   useEffect(() => {
-    const storedMode = window.localStorage.getItem("stock-classification:mode");
-    if (storedMode === "queue") {
-      setMode("queue");
-    }
+    const storedMode = window.localStorage.getItem("stock-classification:mode") as WorkbenchMode | null;
+    if (storedMode && ["rich", "atlas", "ai", "report", "account"].includes(storedMode)) setMode(storedMode);
   }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [mode]);
+
+  useEffect(() => {
+    void fetch("/api/research-queue", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<ResearchQueue> : Promise.reject(new Error("queue unavailable")))
+      .then((queue) => setQueueSummary({
+        attention: queue.items.filter((item) => item.taskStatus !== "in_progress").length,
+        running: queue.items.filter((item) => item.taskStatus === "in_progress").length,
+      }))
+      .catch(() => setQueueSummary({ attention: 0, running: 0 }));
+  }, [refreshKey, queueOpen]);
 
   const changeMode = (nextMode: WorkbenchMode) => {
     setMode(nextMode);
@@ -56,126 +69,41 @@ export function Workbench() {
   };
 
   const openCompanyFromContext = (stockCode: string, categoryId: number | null) => {
-    setResearchFocusTask(null);
     setSelectedStockCode(null);
     setPendingCompanySelection({ stockCode, categoryId });
     setSelectedCategoryId(categoryId);
-    changeMode("research");
+    setQueueOpen(false);
+    changeMode("atlas");
   };
 
-  const openTaskTarget = (item: ResearchQueueItem) => {
-    if (!item.stockCode) {
-      setSelectedCategoryId(item.categoryId);
-      changeMode("atlas");
-      return;
-    }
-    setResearchFocusTask(item);
-    setSelectedStockCode(null);
-    setPendingCompanySelection({ stockCode: item.stockCode, categoryId: item.categoryId });
-    setSelectedCategoryId(item.categoryId);
-    changeMode("research");
-  };
+  // LEGACY 全屏任务跳转处理器已随旧任务页停用；任务抽屉统一复用 openCompanyFromContext。
 
   const refresh = () => setRefreshKey((value) => value + 1);
-
-  const toggleProfile = () => {
-    setProfileOpen((value) => !value);
-    if (!runtimeStatus) {
-      fetch("/api/runtime-config", { cache: "no-store" })
-        .then((response) => response.ok ? response.json() : null)
-        .then((payload) => setRuntimeStatus(payload))
-        .catch(() => setRuntimeStatus({ deepseekConfigured: false, model: "未知", profileProvidersEnabled: false }));
-    }
-  };
-
   return (
-    <main className={`app-shell is-terminal-mode flex h-screen overflow-hidden ${mode === "atlas" ? "is-atlas-mode" : ""} ${mode === "results" ? "is-results-mode" : ""}`}>
+    <main className={`app-shell is-terminal-mode is-${mode}-mode flex h-screen overflow-hidden`} data-workspace={mode}>
       <div className="flex min-h-0 w-full flex-col">
         <div className="terminal-workspace-header">
           <div className="workspace-brand">
-            <span className="workspace-brand-mark" aria-hidden="true">A</span>
-            <div>
-              <h1>A 股产业链分类工作台</h1>
-              <p>产业关系、公司研究与证据核验的一体化工作空间</p>
-            </div>
+            <span className="workspace-brand-mark" aria-hidden="true"><Orbit /></span>
+            <h1>Yidianx</h1>
           </div>
           <WorkbenchModeSwitch
             value={mode}
-            onChange={(nextMode) => {
-              if (nextMode === "research") {
-                setSelectedStockCode(null);
-                setPendingCompanySelection(null);
-                setResearchHomeKey((value) => value + 1);
-              }
-              changeMode(nextMode);
-            }}
-            onOpenQueue={() => changeMode("queue")}
+            onChange={changeMode}
           />
-          <button type="button" className="workspace-profile" title="账户与偏好设置" aria-label="账户与偏好设置" aria-expanded={profileOpen} onClick={toggleProfile}>
-            <span>N</span><ChevronDown aria-hidden="true" />
-          </button>
-          {profileOpen ? <aside className="workspace-profile-popover" role="dialog" aria-label="账户与运行配置">
-            <header><div><span>N</span><div><strong>本地研究工作区</strong><small>账户与运行配置</small></div></div><button type="button" aria-label="关闭账户设置" onClick={() => setProfileOpen(false)}><X aria-hidden="true" /></button></header>
-            <section><b>AI 研究服务</b><p className={runtimeStatus?.deepseekConfigured ? "is-ready" : "is-pending"}>{runtimeStatus?.deepseekConfigured ? <CheckCircle2 aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}{runtimeStatus ? runtimeStatus.deepseekConfigured ? `DeepSeek 已配置 · ${runtimeStatus.model}` : "DeepSeek 尚未配置" : "正在读取安全配置…"}</p></section>
-            <section><b>公司资料 Provider</b><p className={runtimeStatus?.profileProvidersEnabled ? "is-ready" : "is-pending"}><ShieldCheck aria-hidden="true" />{runtimeStatus ? runtimeStatus.profileProvidersEnabled ? "真实数据源已启用" : "当前为本地证据边界模式" : "正在读取运行状态…"}</p></section>
-            <small>密钥只在服务端读取，不会在界面或接口中返回。</small>
-          </aside> : null}
+          <WorkspaceAccountActions
+            queue={queueSummary}
+            queueOpen={queueOpen}
+            accountActive={mode === "account"}
+            onOpenQueue={() => setQueueOpen(true)}
+            onOpenAccount={(section) => { setAccountSection(section); changeMode("account"); }}
+          />
         </div>
-        <GlobalMarketTicker />
+        {/* LEGACY GLOBAL TICKER（按产品要求注释保留）：<GlobalMarketTicker /> */}
 
-        {mode === "research" ? (
-          <ResearchWorkbench
-            selectedCategoryId={selectedCategoryId}
-            selectedStockCode={selectedStockCode}
-            refreshKey={refreshKey}
-            homeKey={researchHomeKey}
-            focusTask={researchFocusTask}
-            onSelectCompany={openCompanyFromContext}
-            onOpenAtlas={() => changeMode("atlas")}
-            onOpenResults={() => changeMode("results")}
-            onOpenQueue={() => changeMode("queue")}
-            onOpenSector={(categoryId) => {
-              setSectorCategoryId(categoryId);
-              changeMode("sector");
-            }}
-            onChanged={refresh}
-          />
-        ) : mode === "results" ? (
-          <ResearchResultsLibrary
-            refreshKey={refreshKey}
-            onOpenCompany={openCompanyFromContext}
-            onOpenAtlas={(categoryId) => {
-              setSelectedCategoryId(categoryId);
-              changeMode("atlas");
-            }}
-            onCreate={() => {
-              setSelectedStockCode(null);
-              setPendingCompanySelection(null);
-              setResearchHomeKey((value) => value + 1);
-              changeMode("research");
-            }}
-          />
-        ) : mode === "sector" ? (
-          <SectorResearch
-            selectedCategoryId={sectorCategoryId}
-            refreshKey={refreshKey}
-            onSelectCategory={setSectorCategoryId}
-            onOpenCompany={(stockCode) => {
-              openCompanyFromContext(stockCode, sectorCategoryId);
-            }}
-            onOpenAtlas={() => {
-              setSelectedCategoryId(sectorCategoryId);
-              changeMode("atlas");
-            }}
-            onOpenWorkbench={() => changeMode("research")}
-          />
-        ) : mode === "queue" ? (
-          <ResearchQueue
-            refreshKey={refreshKey}
-            onOpenCompany={openCompanyFromContext}
-            onOpenTarget={openTaskTarget}
-          />
-        ) : (
+        {mode === "rich" ? (
+          <RichWorkbenchWorkspace onOpenAtlas={() => changeMode("atlas")} />
+        ) : mode === "atlas" ? (
           <IndustryAtlas
             selectedCategoryId={selectedCategoryId}
             selectedStockCode={selectedStockCode}
@@ -190,15 +118,26 @@ export function Workbench() {
             }}
             onOpenResearch={(stockCode) => {
               setSelectedStockCode(stockCode);
-              changeMode("research");
+              changeMode("ai");
             }}
+            onOpenReport={(stockCode) => { setSelectedStockCode(stockCode); changeMode("report"); }}
             onOpenSectorResearch={(categoryId) => {
               setSelectedCategoryId(categoryId);
-              setSectorCategoryId(categoryId);
-              changeMode("sector");
+              changeMode("atlas");
             }}
           />
+        ) : mode === "ai" || mode === "report" ? (
+          <section className="primary-intelligence-workspace" aria-label={mode === "ai" ? "AI研判" : "研报生成"}>
+            <ResearchIntelligenceDock stockCode={selectedStockCode} companyName={selectedStockCode ?? ""} categoryId={selectedCategoryId} tab={mode === "ai" ? "agents" : "report"} onTabChange={(tab) => changeMode(tab === "agents" ? "ai" : "report")} onClose={() => changeMode("atlas")} embedded />
+          </section>
+        ) : (
+          <AccountWorkspace section={accountSection} queueCount={queueSummary.attention} onOpenQueue={() => setQueueOpen(true)} onSectionChange={setAccountSection} />
         )}
+
+        {/* LEGACY PAGE ROUTING（按产品要求注释保留，不删除原组件）：
+            研究工作台 ResearchWorkbench、公司研究 SectorResearch、成果库 ResearchResultsLibrary
+            与全屏任务中心 ResearchQueue 的旧渲染分支已停用。 */}
+        <ResearchQueueDrawer open={queueOpen} refreshKey={refreshKey} onClose={() => setQueueOpen(false)} onOpenCompany={openCompanyFromContext} />
       </div>
     </main>
   );

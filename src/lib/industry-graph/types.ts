@@ -100,6 +100,10 @@ export type IndustryGraphNode =
       summary: string;
       evidenceCount: number;
       layoutSeed: number;
+      profileRole?: "hub" | "member";
+      profileBranch?: "upstream" | "core" | "downstream" | "organization" | "peer";
+      parentNodeId?: string;
+      facts?: Array<{ label: string; value: string }>;
     }
   | {
       id: string;

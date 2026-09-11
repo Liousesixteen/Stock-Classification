@@ -15,10 +15,11 @@ export function getRateLimitPolicy(
   env: Record<string, string | undefined> = process.env,
 ): RateLimitPolicy {
   const windowMs = positiveInteger(env.STOCK_RATE_LIMIT_WINDOW_MS, 60_000);
-  if (pathname.startsWith("/api/ai/")) {
+  const normalizedMethod = method.toUpperCase();
+  if (pathname.startsWith("/api/ai/") && !["GET", "HEAD", "OPTIONS"].includes(normalizedMethod)) {
     return { bucket: "ai", limit: positiveInteger(env.STOCK_RATE_LIMIT_AI_PER_MINUTE, 12), windowMs };
   }
-  if (!["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) {
+  if (!["GET", "HEAD", "OPTIONS"].includes(normalizedMethod)) {
     return { bucket: "write", limit: positiveInteger(env.STOCK_RATE_LIMIT_WRITE_PER_MINUTE, 120), windowMs };
   }
   return { bucket: "read", limit: positiveInteger(env.STOCK_RATE_LIMIT_READ_PER_MINUTE, 360), windowMs };

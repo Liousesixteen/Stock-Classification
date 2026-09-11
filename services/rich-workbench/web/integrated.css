@@ -1,0 +1,21 @@
+/* Main-project density alignment. Keeps every market module and interaction intact. */
+:root{--rail:184px;--font:"Avenir Next","PingFang SC","Hiragino Sans GB",sans-serif}
+body{font-size:12px;line-height:1.55;letter-spacing:.03em}
+header{min-height:50px;margin-left:var(--rail)}
+.toprow{min-height:50px;padding:7px 18px;gap:8px}
+.frost-sidebar{width:var(--rail)}
+.frost-nav{padding:10px 7px 8px;gap:1px}
+.nav-group{padding:11px 10px 4px;font-size:8px;line-height:1.45}
+.frost-nav a{gap:9px;padding:7px 10px;font-size:11px;line-height:1.45;border-radius:8px}
+.sidebar-foot{padding:10px;font-size:8px;line-height:1.55}
+.wrap{margin-left:var(--rail);padding:0 17px 44px}
+.section{padding:18px 22px;margin-top:17px;scroll-margin-top:68px}
+.section>h2{gap:9px;font-size:16px;line-height:1.35;padding-bottom:11px;margin-bottom:13px}
+.section>h2:before{height:18px}.section>h2 .tag,.sec-summary{font-size:9px;line-height:1.45}
+button,select{font-size:11px;line-height:1.4;padding:6px 10px;border-radius:8px}
+.grid{gap:10px}.card,.idx-tile,.val-card,.cond-card,.signal-card,.ov-hero,.ov-card,.fam-block,.pf-box,.tech-checklist,.tech-matrix,.tech-verdict,.trend-hero,.detail-more,.val-alert,.flow-col,.news-panel{border-radius:11px}
+.idx-tile{min-height:105px;padding:10px}.idx-name{font-size:11px}.idx-tile .big{font-size:20px}.idx-price{font-size:10px}
+.ov-hero{padding:16px;gap:16px}.ov-verdict{font-size:19px}.rank-card{padding:12px}.rank-card h3{font-size:12px}
+.su-item,.flow-item,.news-item,.bt-row,.ind-change{gap:7px;padding:7px 9px;margin-top:5px}
+.lbl,.state{font-size:9px;line-height:1.55}.big{font-size:25px}.load-progress{top:50px;left:var(--rail)}
+@media(max-width:1100px){:root{--rail:0px}.wrap{padding-left:12px;padding-right:12px}.section{padding:15px 10px}.toprow{padding:7px 12px}}

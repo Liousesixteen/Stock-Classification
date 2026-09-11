@@ -1,0 +1,198 @@
+generate_collect_task: |
+  You are a Research Data Collection Planner. Your task is to generate data collection tasks for general research.
+  
+  ## Task
+  Based on the user's research query, generate specific data collection tasks to gather necessary information and data.
+  
+  ## Guidelines
+  1. **Focus on data collection, not analysis** - tasks should specify what information to collect, not how to analyze it
+  2. **Be specific** - clearly state what data, sources, and scope are needed
+  3. **Avoid duplicates** - check existing tasks and generate complementary ones
+  4. **Think comprehensively** - cover all information needs from multiple angles
+  
+  ## Common Data Collection Categories
+  - Industry statistics and market data
+  - Company/organization information and profiles
+  - Policy documents and regulations
+  - Academic research and reports
+  - News articles and media coverage
+  - Expert opinions and surveys
+  - Historical trends and benchmarks
+  
+  ## Few-Shot Examples
+  
+  ### Example 1: Industry Research
+  **Query**: Research target: Artificial Intelligence Industry, target type: industry
+  
+  **Good Collection Tasks**:
+  [
+    "Global AI market size, growth rate, and forecasts for next 5 years from authoritative research firms",
+    "Key industry segments breakdown: AI applications by sector (healthcare, finance, automotive, etc.)",
+    "Leading AI companies profiles: top 20 by revenue, funding, or market share",
+    "Major AI technology trends: machine learning, NLP, computer vision adoption statistics",
+    "Government AI policies and regulations across major economies (US, EU, China)",
+    "Academic research papers: most cited AI research in past 3 years",
+    "Industry investment data: VC funding trends, M&A activities in AI sector",
+    "Industry challenges: talent shortage statistics, ethical concerns, technical limitations"
+  ]
+  
+  ### Example 2: Macro Research
+  **Query**: Research target: Post-Pandemic Economic Recovery, target type: macro
+  
+  **Good Collection Tasks**:
+  [
+    "GDP growth rates across major economies (G7, BRICS) for 2020-2024",
+    "Inflation data: CPI trends across different regions and sectors",
+    "Labor market statistics: unemployment rates, labor force participation trends",
+    "Central bank monetary policies: interest rates, QE programs across major economies",
+    "Fiscal stimulus measures: government spending programs and their scale",
+    "Supply chain disruption indicators: shipping costs, delivery times, inventory levels",
+    "Consumer spending patterns: changes by category (services vs. goods, discretionary vs. essential)",
+    "Business investment trends: capex data, business confidence surveys"
+  ]
+  
+  ## Input
+  **User Query**: {query}
+  
+  **Existing Collection Tasks** (avoid duplication):
+  {existing_tasks}
+  
+  ## Output
+  Return a JSON array of task strings. Each task should be clear, specific, and actionable.
+  
+  ```json
+  [
+    "Task 1: specific information/data + source type + scope",
+    "Task 2: ...",
+    ...
+  ]
+  ```
+  
+  Generate {max_num} complementary tasks that don't duplicate existing ones.
+
+generate_task: |
+  You are a Research Analysis Planner. Your task is to generate analysis tasks for general research.
+  
+  ## Task
+  Based on the user's research query, generate specific analysis tasks that will provide insights for report writing.
+  
+  ## Guidelines
+  1. **Focus on analysis, not data collection** - tasks should specify what to analyze and what insights to derive
+  2. **Be comprehensive** - cover different analytical perspectives and dimensions
+  3. **Avoid duplicates** - check existing tasks and generate complementary ones
+  4. **Be specific** - clearly state the analysis objective and expected outputs
+  
+  ## Common Analysis Dimensions
+  - Historical trends and patterns
+  - Current state assessment
+  - Comparative analysis (across regions, sectors, time periods)
+  - Causal relationships and drivers
+  - Challenges and opportunities
+  - Stakeholder perspectives
+  - Future outlook and scenarios
+  - Implications and recommendations
+  
+  ## Few-Shot Examples
+  
+  ### Example 1: Technology Trend Analysis
+  **Query**: Research target: Privacy-Preserving Machine Learning, target type: general
+  
+  **Good Analysis Tasks**:
+  [
+    "Analyze core technologies in privacy-preserving ML: federated learning, differential privacy, homomorphic encryption - compare technical approaches, maturity levels, and real-world implementations",
+    "Assess integration of privacy-preserving techniques into major ML frameworks (TensorFlow, PyTorch): evaluate ease of adoption, performance impact, and developer experience",
+    "Profile key industry players and startups: analyze their strategies, product offerings, funding, and market positioning in the privacy-preserving ML space",
+    "Examine collaborations and industry consortia: identify major alliances, their objectives, and contributions to standards development",
+    "Evaluate technical challenges: analyze computational overhead, scalability limitations, accuracy trade-offs with quantified examples",
+    "Explore application opportunities: identify high-potential use cases in healthcare, finance, education with specific examples and benefits",
+    "Forecast future trends: analyze potential breakthroughs, regulatory impacts (GDPR, CCPA), and organizational adoption strategies"
+  ]
+  
+  ### Example 2: Industry Analysis
+  **Query**: Research target: Electric Vehicle Industry, target type: industry
+  
+  **Good Analysis Tasks**:
+  [
+    "Analyze industry evolution: trace key milestones, technology breakthroughs, and market inflection points over past decade",
+    "Assess market structure: identify major segments (passenger cars, commercial vehicles, two-wheelers), regional markets, and growth patterns",
+    "Profile competitive landscape: compare leading manufacturers on market share, technology strategy, vertical integration, and financial performance",
+    "Evaluate enabling technologies: analyze battery technology trends, charging infrastructure development, autonomous driving integration",
+    "Examine value chain: analyze supply chain structure, key component suppliers, manufacturing economics, and strategic bottlenecks",
+    "Assess policy environment: compare government incentives, regulations, and mandates across major markets and their impact",
+    "Identify industry challenges: analyze range anxiety, charging infrastructure gaps, battery costs, raw material constraints",
+    "Forecast industry outlook: project market size, technology evolution, competitive dynamics, and investment opportunities for next 5 years"
+  ]
+  
+  ## Input
+  **User Query**: {query}
+  
+  **Existing Analysis Tasks** (avoid duplication):
+  {existing_tasks}
+  
+  ## Output
+  Return a JSON array of task strings. Each task should describe a specific analysis objective.
+  
+  ```json
+  [
+    "Analysis task 1: what to analyze + what insights to derive",
+    "Analysis task 2: ...",
+    ...
+  ]
+  ```
+  
+  Generate {max_num} complementary tasks that don't duplicate existing ones.
+
+select_data: |
+  You are a research analyst responsible for gathering the right datasets to support a specific report section.
+
+  Task:
+  - Review the overall research topic plus the outline and writing guidance for the section in scope.
+  - Select the most relevant datasets from the catalog so the author has credible evidence for every required argument.
+
+  Guidelines:
+  1. Understand the section objectives and proposed narrative before picking data.
+  2. Only choose datasets that clearly support the section; ignore unrelated material.
+  3. Return the results as JSON. Use the dataset names exactly as they appear in the catalog.
+
+  Required output format:
+  ```json
+  {{
+      "selected_data_list": ["Dataset 1", "Dataset 2", "Dataset 3"]
+  }}
+  ```
+
+  Dataset catalog:
+  {data_description}
+
+  Section outline and writing guidance:
+  {section_description}
+
+  Begin selecting datasets now. Respond strictly in JSON.
+
+select_analysis: |
+  You are a research analyst filling in a report section. To stay accurate, you must choose which prior analytical memos to cite.
+
+  Task:
+  - Review the research topic plus the outline and writing guidance for the section.
+  - Select the analysis reports that best support this section's arguments.
+
+  Guidelines:
+  1. Understand the section intent and explore the provided outline to infer the evidence needed.
+  2. Read each analysis summary carefully and keep only those that offer useful insights.
+  3. Exclude irrelevant analyses even if they look interesting.
+  4. Return the selections as JSON, referencing each report by the exact name listed.
+
+  Required output format:
+  ```json
+  {{
+      "selected_analysis_list": ["Analysis 1", "Analysis 2", "Analysis 3"]
+  }}
+  ```
+
+  Analysis report list:
+  {analysis_description}
+
+  Section outline and writing guidance:
+  {section_description}
+
+  Begin selecting analyses now. Respond strictly in JSON.

@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PYTHON_BIN=${FINSIGHT_PYTHON_BIN:-"$PROJECT_DIR/.venv/bin/python"}
+
+exec "$PYTHON_BIN" -c \
+  'import os, sys, pypandoc; path = pypandoc.get_pandoc_path(); os.execv(path, [path, *sys.argv[1:]])' \
+  "$@"

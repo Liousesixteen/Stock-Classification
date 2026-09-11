@@ -1,0 +1,11 @@
+mootdx>=0.10
+requests
+pandas
+stockstats
+yfinance
+akshare
+efinance
+tushare
+baostock
+pytdx
+longport

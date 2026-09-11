@@ -39,13 +39,16 @@ export function buildResearchEvidenceCatalog(facts: CompanyResearchFacts): Resea
     if (verificationStatus !== "verified" && !hasTraceableSourceUrl(text(row.sourceUrl))) return;
     const fieldKey = text(row.fieldKey) || `field-${index + 1}`;
     const provider = text(row.provider) || "字段数据源";
+    const value = isRecord(row.value) ? row.value : null;
+    const title = text(value?.title) || `${friendlyFieldName(fieldKey)} · ${provider}`;
+    const excerpt = text(value?.summary) || text(value?.snippet) || valueText(row.value);
     addCitation(citations, {
       id: `field:${fieldKey}:${slug(provider)}`,
-      title: `${fieldKey} · ${provider}`,
-      sourceType: "字段事实",
-      sourceDate: text(row.fetchedAt),
+      title,
+      sourceType: fieldSourceType(fieldKey, value),
+      sourceDate: text(value?.sourceDate) || text(row.fetchedAt),
       url: text(row.sourceUrl),
-      excerpt: valueText(row.value),
+      excerpt,
       credibility: providerConfidence(row.confidence),
     });
   });
@@ -108,6 +111,22 @@ function providerConfidence(value: unknown): ResearchCitation["credibility"] {
 
 function slug(value: string) {
   return value.toLocaleLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-|-$/g, "") || "source";
+}
+
+function friendlyFieldName(fieldKey: string) {
+  if (fieldKey === "marketIndices") return "主要指数实时行情";
+  if (fieldKey === "sectorRankings") return "行业涨跌排名";
+  if (fieldKey === "marketBreadth") return "A股市场宽度与成交额";
+  if (fieldKey === "marketTechnicalSnapshots") return "主要指数历史趋势与技术指标";
+  if (/marketNews|openNews|externalNews/.test(fieldKey)) return "市场情报";
+  return fieldKey;
+}
+
+function fieldSourceType(fieldKey: string, value: Record<string, unknown> | null) {
+  if (fieldKey === "marketIndices" || fieldKey === "sectorRankings" || fieldKey === "marketBreadth") return "实时市场数据";
+  if (fieldKey === "marketTechnicalSnapshots") return "指数历史行情";
+  if (/marketNews|openNews|externalNews/.test(fieldKey)) return text(value?.source) || "公开市场情报";
+  return "字段事实";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -2,27 +2,19 @@
 
 import { Activity } from "lucide-react";
 
-const MARKETS = [
-  { name: "上证指数", value: "3,274.42", change: "+0.36%", tone: "up" },
-  { name: "沪深300", value: "3,856.91", change: "+0.28%", tone: "up" },
-  { name: "恒生指数", value: "19,912.61", change: "-0.14%", tone: "down" },
-  { name: "日经225", value: "39,646.36", change: "+0.61%", tone: "up" },
-  { name: "纳斯达克", value: "18,398.45", change: "+0.24%", tone: "up" },
-  { name: "标普500", value: "5,615.35", change: "-0.08%", tone: "down" },
-  { name: "德国DAX", value: "18,432.12", change: "+0.18%", tone: "up" },
-  { name: "WTI 原油", value: "78.43", change: "-0.42%", tone: "down" },
-];
+export type MarketTickerMarket = { name: string; value: string; change: string; tone: "up" | "down" | "neutral" };
 
-export function GlobalMarketTicker() {
-  const stream = [...MARKETS, ...MARKETS];
+export function GlobalMarketTicker({ markets = [] }: { markets?: MarketTickerMarket[] }) {
+  if (!markets.length) return null;
+  const stream = [...markets, ...markets];
 
   return (
-    <section className="global-market-ticker" aria-label="全球市场指数界面示例，非实时行情">
-      <div className="market-ticker-label"><Activity aria-hidden="true" /><span>行情示例</span><b>NON-LIVE DEMO</b></div>
+    <section className="global-market-ticker" aria-label="市场指数行情">
+      <div className="market-ticker-label"><Activity aria-hidden="true" /><span>市场行情</span><b>LIVE SOURCE</b></div>
       <div className="market-ticker-viewport">
         <div className="market-ticker-track">
           {stream.map((market, index) => (
-            <div className="market-ticker-item" key={`${market.name}-${index}`} aria-hidden={index >= MARKETS.length}>
+            <div className="market-ticker-item" key={`${market.name}-${index}`} aria-hidden={index >= markets.length}>
               <span>{market.name}</span><b>{market.value}</b><em className={market.tone}>{market.change}</em>
             </div>
           ))}

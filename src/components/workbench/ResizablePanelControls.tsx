@@ -103,12 +103,19 @@ export function useResizablePanelLayout(
     }));
   }, []);
 
+  const setCollapsed = useCallback((side: PanelSide, collapsed: boolean) => {
+    setLayout((current) => ({
+      ...current,
+      [side === "left" ? "leftCollapsed" : "rightCollapsed"]: collapsed,
+    }));
+  }, []);
+
   const style = useMemo(() => ({
     "--workspace-left-panel": layout.leftCollapsed ? "0px" : `${layout.leftWidth}px`,
     "--workspace-right-panel": layout.rightCollapsed ? "0px" : `${layout.rightWidth}px`,
   }) as CSSProperties, [layout]);
 
-  return { layout, bounds: { left, right }, style, resize, resizeByKeyboard, toggle };
+  return { layout, bounds: { left, right }, style, resize, resizeByKeyboard, toggle, setCollapsed };
 }
 
 export function ResizablePanelControls({

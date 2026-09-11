@@ -2,6 +2,7 @@ import { createResearchDocumentExport, type ResearchDocumentExportFormat } from 
 import { getDatabase } from "@/lib/db/client";
 import { getResearchDocument } from "@/lib/repositories/researchDocuments";
 import { withApiObservability } from "@/lib/operations/observability";
+import { readFinSightArtifact } from "@/lib/finsight/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,12 @@ async function exportReport(request: Request) {
   if (!Number.isInteger(reportId) || reportId < 1) return Response.json({ error: "报告编号无效" }, { status: 400 });
   const report = getResearchDocument(getDatabase(), reportId);
   if (!report) return Response.json({ error: "研究报告不存在" }, { status: 404 });
-  const content = await createResearchDocumentExport(report, format);
+  const nativeArtifact = report.engine === "finsight"
+    ? report.artifacts.find((artifact) => artifact.format === format)
+    : undefined;
+  const content = nativeArtifact
+    ? await readFinSightArtifact(nativeArtifact) ?? await createResearchDocumentExport(report, format)
+    : await createResearchDocumentExport(report, format);
   const extension = format === "markdown" ? "md" : format;
   const contentType = format === "docx"
     ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

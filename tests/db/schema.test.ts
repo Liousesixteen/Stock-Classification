@@ -443,8 +443,13 @@ describe("database schema", () => {
     migrate(db);
     const documents = db.prepare("pragma table_info(research_documents)").all() as Array<{ name: string }>;
     const versions = db.prepare("pragma table_info(research_document_versions)").all() as Array<{ name: string }>;
-    expect(documents.map((column) => column.name)).toEqual(expect.arrayContaining(["report_type", "subject_key", "current_version", "citations_json", "quality_json", "charts_json"]));
+    expect(documents.map((column) => column.name)).toEqual(expect.arrayContaining(["report_type", "subject_key", "current_version", "citations_json", "quality_json", "charts_json", "engine", "artifacts_json"]));
     expect(versions.map((column) => column.name)).toEqual(expect.arrayContaining(["report_id", "version_number", "change_summary", "source"]));
+    const insert = db.prepare(`insert into research_documents (
+      report_type, subject_key, subject_label, title, content
+    ) values (?, ?, ?, ?, ?)`);
+    expect(() => insert.run("macro", "macro-demo", "宏观研究", "宏观报告", "正文")).not.toThrow();
+    expect(() => insert.run("general", "general-demo", "开放研究", "开放报告", "正文")).not.toThrow();
   });
 });
 

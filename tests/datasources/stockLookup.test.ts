@@ -6,6 +6,7 @@ import {
   lookupFastStockProfile,
   lookupStockProfile,
   lookupStockProfileWithTrace,
+  resolveStockMention,
   resolveStockQuery,
 } from "@/lib/datasources/stockLookup";
 
@@ -37,6 +38,18 @@ describe("stockLookup", () => {
       source: "local_index",
       sourceDetail: "本地股票索引",
     });
+  });
+
+  it("finds one company mentioned inside a research question", () => {
+    const stockIndexItems = [
+      ["600584.SH", "600584", "长电科技", "changdiankej", "cdkj", [], "CN", "stock", true, 100],
+      ["603823.SH", "603823", "百合花", "baihehua", "bhh", [], "CN", "stock", true, 80],
+    ];
+    expect(resolveStockMention("长电科技的核心风险是什么？", { stockIndexItems })).toMatchObject({
+      displayCode: "600584",
+      nameZh: "长电科技",
+    });
+    expect(resolveStockMention("比较长电科技与百合花", { stockIndexItems })).toBeUndefined();
   });
 
   it("maps Eastmoney basics and Baidu related blocks into a richer company profile", async () => {

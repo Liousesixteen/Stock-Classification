@@ -1,0 +1,11 @@
+{
+  "name": "Yidianx 个人投资工作台",
+  "short_name": "Yidianx",
+  "start_url": "/rich-workbench/",
+  "scope": "/rich-workbench/",
+  "display": "standalone",
+  "background_color": "#060912",
+  "theme_color": "#060912",
+  "lang": "zh-CN",
+  "icons": []
+}

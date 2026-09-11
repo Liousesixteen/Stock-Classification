@@ -218,6 +218,33 @@ export function resolveStockQuery(query: string, options: StockLookupOptions = {
   };
 }
 
+export function resolveStockMention(value: string, options: StockLookupOptions = {}): ResolvedStock | undefined {
+  const normalizedValue = normalizeQuery(value);
+  if (!normalizedValue) return undefined;
+  const direct = resolveStockQuery(normalizedValue, options);
+  if (direct) return direct;
+
+  const matches = getStockIndexItems(options).flatMap((item) => {
+    if (!isCnStockItem(item)) return [];
+    const tokens = [item[2], ...item[5]]
+      .filter((token): token is string => typeof token === "string")
+      .map(normalizeQuery)
+      .filter((token) => token.length >= 2 && normalizedValue.includes(token));
+    const matchedLength = Math.max(0, ...tokens.map((token) => token.length));
+    return matchedLength ? [{ item, matchedLength }] : [];
+  }).sort((left, right) =>
+    right.matchedLength - left.matchedLength || right.item[9] - left.item[9],
+  );
+
+  if (!matches[0]) return undefined;
+  if (new Set(matches.map((match) => match.item[1])).size > 1) return undefined;
+  return {
+    canonicalCode: matches[0].item[0],
+    displayCode: matches[0].item[1],
+    nameZh: matches[0].item[2],
+  };
+}
+
 export function lookupFastStockProfile(query: string, options: StockLookupOptions = {}): StockLookupProfile {
   const resolvedStock = resolveStockQuery(query, options);
   if (!resolvedStock) {

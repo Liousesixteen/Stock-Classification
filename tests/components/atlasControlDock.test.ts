@@ -13,12 +13,14 @@ const nodes: IndustryGraphNode[] = [
 ];
 
 describe("AtlasControlDock", () => {
-  it("keeps search and focus controls together while dragging", () => {
+  it("keeps search, focus and reset controls in one toolbar", () => {
+    const onReset = vi.fn();
     const { container } = render(createElement(AtlasControlDock, {
       nodes,
       focus: { categoryId: 1, labels: ["半导体"], categoryCount: 1, companyCount: 0, parentId: null },
       onSelectNode: vi.fn(),
       onSelectCategory: vi.fn(),
+      onReset,
     }));
     const handle = screen.getByRole("button", { name: "拖动聚焦控制台" });
     fireEvent.pointerDown(handle, { pointerId: 1, clientX: 100, clientY: 100 });
@@ -27,6 +29,8 @@ describe("AtlasControlDock", () => {
 
     expect(screen.getByRole("textbox", { name: "定位产业或公司" })).toBeVisible();
     expect(screen.getByLabelText("当前图谱聚焦路径")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重置星图" }));
+    expect(onReset).toHaveBeenCalledOnce();
     expect(container.firstElementChild).toHaveStyle("--atlas-dock-x: 0px");
   });
 });

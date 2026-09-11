@@ -37,10 +37,12 @@ describe("research document repository", () => {
       executiveSummary: "摘要",
       markdown: "# 示例公司研究报告\n\n## 投资摘要\n\n有证据的结论 [evidence:1]",
       model: "test-model",
+      engine: "finsight",
       status: "ready",
       citations: [{ id: "evidence:1", title: "公告", sourceType: "公告", sourceDate: "2026-01-01", url: "", excerpt: "事实", credibility: "高" }],
       quality,
       charts: [],
+      artifacts: [{ format: "markdown", path: "/tmp/report.md", bytes: 120, mediaType: "text/markdown" }],
     });
     saveResearchDocumentVersion(db, {
       reportId: id,
@@ -50,7 +52,7 @@ describe("research document repository", () => {
       quality: { ...quality, score: 88 },
     });
 
-    expect(getResearchDocument(db, id)).toMatchObject({ currentVersion: 2, quality: { score: 88 } });
+    expect(getResearchDocument(db, id)).toMatchObject({ currentVersion: 2, engine: "finsight", quality: { score: 88 }, artifacts: [] });
     expect(getLatestResearchDocument(db, "company", "000001")?.id).toBe(id);
     expect(listResearchDocumentVersions(db, id).map((version) => version.versionNumber)).toEqual([2, 1]);
     db.close();

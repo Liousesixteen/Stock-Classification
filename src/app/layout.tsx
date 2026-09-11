@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "A 股产业链分类工作台",
+  title: "Yidianx",
   description: "本地 A 股产业链股票分类与研究工作台",
 };
 

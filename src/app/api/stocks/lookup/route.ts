@@ -1,9 +1,16 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { lookupFastStockProfile, lookupStockProfile } from "@/lib/datasources/stockLookup";
+import {
+  lookupFastStockProfile,
+  lookupStockProfile,
+  resolveStockMention,
+} from "@/lib/datasources/stockLookup";
 import { getDatabase } from "@/lib/db/client";
 import { getCategoryById } from "@/lib/repositories/categories";
+import { getCompany } from "@/lib/repositories/companies";
 import { listRelationsForCompany } from "@/lib/repositories/relations";
+import { buildCompanyResearchFacts } from "@/lib/research/companyFacts";
+import { buildResearchEvidenceCatalog } from "@/lib/research/researchEvidenceCatalog";
 
 export async function GET(request: NextRequest) {
   const query = (request.nextUrl.searchParams.get("query") ?? request.nextUrl.searchParams.get("code") ?? "").trim();
@@ -12,17 +19,40 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const profile = request.nextUrl.searchParams.get("mode") === "quick"
-      ? lookupFastStockProfile(query)
+    const mode = request.nextUrl.searchParams.get("mode");
+    const mention = mode === "mention" ? resolveStockMention(query) : undefined;
+    if (mode === "mention" && !mention) throw new Error("未匹配到唯一 A 股股票");
+    const profile = mode === "quick" || mention
+      ? lookupFastStockProfile(mention?.displayCode ?? query)
       : await lookupStockProfile(query);
-    const relation = listRelationsForCompany(getDatabase(), profile.stockCode)
-      .sort((left, right) => relationRank(left.relationType) - relationRank(right.relationType))[0];
-    const category = relation ? getCategoryById(getDatabase(), relation.categoryId) : null;
+    const db = getDatabase();
+    const storedCompany = getCompany(db, profile.stockCode);
+    const resolvedProfile = {
+      ...profile,
+      shortName: profile.shortName || storedCompany?.shortName || profile.stockCode,
+      fullName: profile.fullName || storedCompany?.fullName || "",
+      board: profile.board || storedCompany?.board || "",
+      industry: profile.industry || storedCompany?.industry || "",
+      region: profile.region || storedCompany?.region || "",
+      marketCapBand: profile.marketCapBand || storedCompany?.marketCapBand || "",
+      intro: profile.intro || storedCompany?.intro || "",
+      mainBusiness: profile.mainBusiness || storedCompany?.mainBusiness || "",
+    };
+    const relations = listRelationsForCompany(db, profile.stockCode)
+      .sort((left, right) => relationRank(left.relationType) - relationRank(right.relationType));
+    const trustedRelation = relations.find((item) => item.relationType !== "待验证" && item.confidence !== "低");
+    const trackingRelation = trustedRelation ?? relations[0];
+    const category = trustedRelation ? getCategoryById(db, trustedRelation.categoryId) : null;
+    const facts = buildCompanyResearchFacts(db, profile.stockCode, trustedRelation?.categoryId ?? null);
+    const availableEvidenceCount = facts ? buildResearchEvidenceCatalog(facts).length : 0;
     return NextResponse.json({
       profile: {
-        ...profile,
-        categoryId: relation?.categoryId ?? null,
+        ...resolvedProfile,
+        relationId: trackingRelation?.id ?? null,
+        isWatchlist: relations.some((item) => item.isWatchlist),
+        categoryId: trustedRelation?.categoryId ?? null,
         categoryName: category?.name ?? "",
+        availableEvidenceCount,
       },
     });
   } catch (error) {
