@@ -11,13 +11,27 @@
 
 如果 `STOCK_APP_BASIC_AUTH_USER` 与密码同时为空，系统保持本地开发模式；生产环境必须同时配置。只配置其中一项时，服务会返回 503，避免误以为已经受保护。
 
-## Docker 部署
+## Railway 小规模公测
+
+项目根目录的 `Dockerfile` 可由 Railway 直接识别，适合先生成一个带 HTTPS 的
+`*.up.railway.app` 公网地址供受邀用户访问。完整配置见
+[`RAILWAY_DEPLOYMENT.md`](./RAILWAY_DEPLOYMENT.md)。
+
+公测环境必须保持单实例运行，并把一个持久卷挂载到 `/app/data`。SQLite、备份、
+研究任务运行数据都应写入该卷，避免重新部署后丢失。
+
+## Docker 本机或服务器部署
 
 ```bash
 cp .env.example .env.production
 # 编辑 .env.production，填入生产密钥与访问控制
-docker compose build
-docker compose up -d
+docker build -t stock-classification:latest .
+docker run -d --name stock-classification \
+  --env-file .env.production \
+  -p 127.0.0.1:3001:3000 \
+  -v stock-classification-data:/app/data \
+  --restart unless-stopped \
+  stock-classification:latest
 curl -u "$STOCK_APP_BASIC_AUTH_USER:$STOCK_APP_BASIC_AUTH_PASSWORD" \
   http://127.0.0.1:3001/api/health
 ```

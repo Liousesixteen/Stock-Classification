@@ -1,7 +1,10 @@
 .git
+.worktrees
+.superpowers
 .next
 node_modules
-data
+data/*
+!data/provider-acceptance-companies.json
 backups
 .env
 .env.*
@@ -10,3 +13,8 @@ playwright-report
 test-results
 coverage
 *.log
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.playwright-browsers

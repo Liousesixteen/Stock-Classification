@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
 const workspaceRoot = process.cwd();
@@ -8,7 +9,9 @@ const databasePath = process.env.STOCK_CLASSIFICATION_DB_PATH || path.join(
   "data",
   "stock-classification.sqlite",
 );
-const serverPath = path.join(workspaceRoot, ".next", "standalone", "server.js");
+const standaloneServerPath = path.join(workspaceRoot, ".next", "standalone", "server.js");
+const containerServerPath = path.join(workspaceRoot, "server.js");
+const serverPath = fs.existsSync(standaloneServerPath) ? standaloneServerPath : containerServerPath;
 const runtimeEnv = {
   ...process.env,
   STOCK_CLASSIFICATION_DB_PATH: databasePath,
