@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 async function reportEngineStatus() {
   const finsight = await getFinSightRuntimeStatus();
   return Response.json({
-    defaultEngine: process.env.FINSIGHT_REPORT_ENGINE === "finsight" ? "finsight" : "native",
+    defaultEngine: (process.env.REPORT_ENGINE_MODE || process.env.FINSIGHT_REPORT_ENGINE) === "finsight" ? "finsight" : "native",
     engines: {
       native: { available: true, label: "证据约束引擎" },
       finsight: {

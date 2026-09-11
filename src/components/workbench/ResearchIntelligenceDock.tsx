@@ -191,7 +191,7 @@ export function ResearchIntelligenceDock({ stockCode, companyName, categoryId, c
   const [sessionId, setSessionId] = useState(createResearchSessionId);
   const [sessions, setSessions] = useState<ResearchConversationSession[]>([]);
   const [conversationMessages, setConversationMessages] = useState<ResearchConversationMessage[]>([]);
-  // Match DA-Stock: a new conversation starts as general research. A strategy is
+  // A new conversation starts as general research. A strategy is
   // activated only when the user selects it or names it in the question.
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [contextCompressionEnabled, setContextCompressionEnabled] = useState(false);
@@ -1575,7 +1575,7 @@ function AiResearchWorkspace({
           {!running && !result && conversationMessages.length === 0 ? <article className="ai-research-empty">
             <span><Sparkles /><i>AI</i></span>
             <h3>直接提出你的金融问题</h3>
-            <p>无需选择标的或套用格式。系统会理解问题，自动调用迁移后的金融数据源、研究工具和多 Agent 工作流，并让回答结构随问题与证据动态生成。</p>
+            <p>无需选择标的或套用格式。系统会理解问题，自动调用内置金融数据源、研究工具和多 Agent 工作流，并让回答结构随问题与证据动态生成。</p>
             <small className="ai-quick-questions-label">示例提问 · 仅填入编辑框，不会自动运行</small>
             <div className="ai-quick-questions" aria-label="研究问题示例">{QUICK_RESEARCH_QUESTIONS.map((item) => <button type="button" key={item.label} onClick={() => { onQuestionChange(item.label); onSelectedSkillsChange([item.skill]); }}>{item.label}</button>)}</div>
           </article> : null}

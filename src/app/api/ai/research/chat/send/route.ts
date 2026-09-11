@@ -1,2 +1,2 @@
-// Compatibility alias for DA-Stock's notification endpoint.
+// Compatibility alias for the research notification endpoint.
 export { POST } from "../../share/route";

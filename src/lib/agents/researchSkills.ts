@@ -8,7 +8,7 @@ export type ResearchSkill = {
   instructions: string;
 };
 
-// Ported from DA-Stock/strategies. The current application keeps the strategy
+// Built-in strategy catalogue. The current application keeps the strategy
 // contract in TypeScript so it can share the same Provider and evidence model.
 export const RESEARCH_SKILLS: ResearchSkill[] = [
   {
@@ -157,7 +157,7 @@ export function resolveResearchSkills(ids: string[] | undefined, limit = 3) {
 }
 
 /**
- * DA-Stock treats a strategy explicitly named by the user as the highest
+ * A strategy explicitly named by the user has the highest
  * priority routing signal. Keep that behaviour even when the UI still carries
  * the default bull-trend selection from a previous turn.
  */

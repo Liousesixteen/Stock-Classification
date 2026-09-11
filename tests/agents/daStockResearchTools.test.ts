@@ -28,8 +28,8 @@ const facts: CompanyResearchFacts = {
   notes: [],
 };
 
-describe("DA-Stock research tool migration", () => {
-  it("keeps the complete DA-Stock public tool catalogue", () => {
+describe("research tool catalogue", () => {
+  it("keeps the complete public tool catalogue", () => {
     expect(DA_STOCK_RESEARCH_TOOLS.map((tool) => tool.id)).toEqual(expect.arrayContaining([
       "get_realtime_quote",
       "get_daily_history",

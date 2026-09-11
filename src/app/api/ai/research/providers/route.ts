@@ -14,6 +14,6 @@ export async function GET() {
     enabledCount: rows.filter((provider) => provider.enabled).length,
     providers: rows,
     error: "",
-    engine: "vendored-da-stock",
+    engine: "local-research-engine",
   }, { headers: { "Cache-Control": "no-store" } });
 }

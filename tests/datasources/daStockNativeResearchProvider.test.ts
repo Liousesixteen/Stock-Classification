@@ -13,7 +13,7 @@ import { migrate } from "@/lib/db/schema";
 import { listCompanyFieldFacts } from "@/lib/repositories/companyFieldFacts";
 import { upsertCompany } from "@/lib/repositories/companies";
 
-describe("DA-Stock native research providers", () => {
+describe("native research providers", () => {
   it("keeps authoritative market publishers and rejects forum or content-farm sources", () => {
     expect(isTrustedOpenMarketSource({ url: "https://finance.eastmoney.com/a/20260815.html" })).toBe(true);
     expect(isTrustedOpenMarketSource({ url: "https://www.csrc.gov.cn/csrc/c100028/content.shtml" })).toBe(true);

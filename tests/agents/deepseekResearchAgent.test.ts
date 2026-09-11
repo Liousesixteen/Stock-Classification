@@ -383,7 +383,7 @@ describe("deepseek research agent", () => {
     expect(JSON.stringify(modelPayload).length).toBeLessThan(32_000);
   });
 
-  it("runs selected DA-Stock strategies as bounded specialist agents with conversation context", async () => {
+  it("runs selected strategies as bounded specialist agents with conversation context", async () => {
     const roles: string[] = [];
     const histories: unknown[] = [];
     const result = await runDeepResearchTeam(facts, {

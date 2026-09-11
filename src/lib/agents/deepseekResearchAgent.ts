@@ -147,7 +147,7 @@ const CHIEF_BLUEPRINT: ResearchAgentBlueprint = {
   kind: "chief",
 };
 const MODE_LIMITS: Record<ResearchDepth, { maxAgentCalls: number; specialistTokens: number; chiefTokens: number; timeoutMs: number }> = {
-  // DA-Stock's provider profile allows substantially larger structured replies.
+  // The provider profile allows substantially larger structured replies.
   // The earlier limits truncated Chinese JSON mid-string, causing the visible
   // "Unterminated string" failure even though the model request itself succeeded.
   quick: { maxAgentCalls: 1, specialistTokens: 0, chiefTokens: 5200, timeoutMs: 80_000 },

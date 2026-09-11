@@ -13,8 +13,8 @@ const runtimeEnv = {
   ...process.env,
   STOCK_CLASSIFICATION_DB_PATH: databasePath,
   // Next's generated standalone server changes cwd to .next/standalone. Keep
-  // DA-Stock's private runtime and database anchored to the real workspace.
-  DA_STOCK_PYTHON: process.env.DA_STOCK_PYTHON || path.join(
+  // Keep the local strategy runtime and database anchored to the real workspace.
+  DA_STOCK_PYTHON: process.env.STRATEGY_ENGINE_PYTHON || process.env.DA_STOCK_PYTHON || path.join(
     workspaceRoot,
     "services",
     "da-stock",
@@ -22,7 +22,7 @@ const runtimeEnv = {
     "bin",
     "python",
   ),
-  DA_STOCK_BACKTEST_DB: process.env.DA_STOCK_BACKTEST_DB || path.join(
+  DA_STOCK_BACKTEST_DB: process.env.STRATEGY_ENGINE_BACKTEST_DB || process.env.DA_STOCK_BACKTEST_DB || path.join(
     workspaceRoot,
     "data",
     "da-stock",

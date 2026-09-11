@@ -113,7 +113,7 @@ export async function runDAStockEngine(
   options.signal?.throwIfAborted();
   const data = path.join(process.cwd(), "data/da-stock");
   mkdirSync(data, { recursive: true });
-  const python = process.env.DA_STOCK_PYTHON || path.join(root(), ".venv/bin/python");
+  const python = process.env.STRATEGY_ENGINE_PYTHON || process.env.DA_STOCK_PYTHON || path.join(root(), ".venv/bin/python");
   const local = existsSync(python);
   const name = `stock-research-${crypto.randomUUID()}`;
   const env = engineEnvironment();
@@ -153,7 +153,7 @@ export async function runDAStockEngine(
       } catch { /* Non-protocol dependency output is never answer content. */ }
     });
     const cleanup = () => { clearTimeout(timer); options.signal?.removeEventListener("abort", abort); };
-    child.on("error", () => { cleanup(); reject(new Error("问股运行环境未就绪，请配置 DA_STOCK_PYTHON 或构建研究镜像")); });
+    child.on("error", () => { cleanup(); reject(new Error("问股运行环境未就绪，请配置策略引擎 Python 或构建研究镜像")); });
     child.on("close", (code) => {
       cleanup();
       if (failure) reject(failure);

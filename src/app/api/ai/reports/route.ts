@@ -304,7 +304,7 @@ function parseSubjectType(value: unknown) {
 
 function parseReportEngine(value: unknown): ResearchReportEngine {
   if (value === "finsight" || value === "native") return value;
-  return process.env.FINSIGHT_REPORT_ENGINE === "finsight" ? "finsight" : "native";
+  return (process.env.REPORT_ENGINE_MODE || process.env.FINSIGHT_REPORT_ENGINE) === "finsight" ? "finsight" : "native";
 }
 
 async function generateWithFinSight(input: {

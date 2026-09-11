@@ -1,4 +1,4 @@
-"""NDJSON adapter for DA-Stock's original backtest service."""
+"""NDJSON adapter for the local strategy backtest service."""
 from __future__ import annotations
 
 from datetime import date

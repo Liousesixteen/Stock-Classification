@@ -156,7 +156,7 @@ def get_real_bars(code: str, start: str, end: str, database_path: str) -> tuple[
     bars = load_local_bars(database_path, plain_code, warmup_start, end)
     if bars:
         return bars, {
-            "source": "DA-Stock 本地日线库",
+            "source": "本地策略日线库",
             "adjustment": "按库存口径",
             "symbol": symbol,
             "asOf": bars[-1].date,

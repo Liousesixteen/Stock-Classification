@@ -89,7 +89,7 @@ export async function getDAStockProviderReadiness(): Promise<DAStockProviderRead
       providerCount: 0,
       enabledCount: 0,
       providers: [],
-      error: "尚未配置 DA_STOCK_PROVIDER_CLI 与 DA_STOCK_ENV_PATH",
+      error: "尚未配置外部数据源命令与环境文件",
     };
   }
 
@@ -316,7 +316,7 @@ export async function fetchDAStockExternalResearchFacts(
   return { configured: true, successfulProviders, failedProviders, fieldFacts };
 }
 
-// DA-Stock's ask-stock Agent can call its generic intelligence-search tool
+// The research Agent can call its generic intelligence-search tool
 // without first binding the conversation to a company. Keep the same ability
 // for broad-market and thematic questions in this application.
 export async function fetchDAStockOpenResearchFacts(
@@ -409,10 +409,10 @@ function openResearchConfidence(row: DAStockNewsResult): "high" | "medium" | "lo
 
 function bridgeConfig() {
   return {
-    python: process.env.DA_STOCK_PYTHON_BIN?.trim() || "python3",
-    cliPath: process.env.DA_STOCK_PROVIDER_CLI?.trim() || "",
-    envPath: process.env.DA_STOCK_ENV_PATH?.trim() || "",
-    timeoutMs: boundedNumber(process.env.DA_STOCK_PROVIDER_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, 3_000, 60_000),
+    python: (process.env.MARKET_PROVIDER_PYTHON_BIN || process.env.DA_STOCK_PYTHON_BIN)?.trim() || "python3",
+    cliPath: (process.env.MARKET_PROVIDER_CLI || process.env.DA_STOCK_PROVIDER_CLI)?.trim() || "",
+    envPath: (process.env.MARKET_PROVIDER_ENV_PATH || process.env.DA_STOCK_ENV_PATH)?.trim() || "",
+    timeoutMs: boundedNumber(process.env.MARKET_PROVIDER_TIMEOUT_MS || process.env.DA_STOCK_PROVIDER_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, 3_000, 60_000),
   };
 }
 

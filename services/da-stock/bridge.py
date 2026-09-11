@@ -1,4 +1,4 @@
-"""Private stdin/NDJSON adapter for the vendored DA-Stock chat engine.
+"""Private stdin/NDJSON adapter for the local multi-agent research engine.
 
 No HTTP port, source-project import, or alternate research implementation.
 stdout contains only protocol events; upstream diagnostics go to stderr.
@@ -65,7 +65,7 @@ def main():
         return
     if not config.is_agent_available():
         raise RuntimeError("问股引擎未配置可用模型，请检查现有模型配置")
-    # Import pre-migration turns once; the upstream store then owns its full
+    # Import earlier turns once; the engine store then owns its full
     # provider/tool trace and context compression, not a lossy summary adapter.
     from src.storage import get_db
     session_id = request["session_id"]

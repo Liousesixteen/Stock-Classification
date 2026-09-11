@@ -5,8 +5,8 @@ import {
   resolveResearchSkills,
 } from "@/lib/agents/researchSkills";
 
-describe("DA-Stock research skills", () => {
-  it("keeps all fifteen built-in DA-Stock strategies", () => {
+describe("research skills", () => {
+  it("keeps all fifteen built-in strategies", () => {
     expect(RESEARCH_SKILLS).toHaveLength(15);
     expect(RESEARCH_SKILLS.map((skill) => skill.id)).toEqual(expect.arrayContaining([
       "chan_theory",

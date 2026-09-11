@@ -22,7 +22,7 @@ type DAStockChatRequest = {
   depth?: unknown;
 };
 
-// Non-streaming compatibility endpoint matching DA-Stock's /agent/chat shape.
+// Non-streaming compatibility endpoint for the local research protocol.
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as DAStockChatRequest;
   const message = typeof body.message === "string" ? body.message.trim() : "";

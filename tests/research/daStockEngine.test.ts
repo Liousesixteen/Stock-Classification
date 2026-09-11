@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { localizeCatalogTool, mapEngineProgress, publicEngineError } from "@/lib/research/daStockEngine";
 
-describe("DA-Stock engine protocol", () => {
+describe("research engine protocol", () => {
   it("preserves real tool duration and localizes the original tool event", () => {
     expect(mapEngineProgress({
       type: "tool_done",

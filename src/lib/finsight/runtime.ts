@@ -44,23 +44,23 @@ export type FinSightRuntimeStatus = {
 export async function getFinSightRuntimeStatus(): Promise<FinSightRuntimeStatus> {
   const serviceRoot = finSightServiceRoot();
   const python = await resolvePython(serviceRoot);
-  const chartsEnabled = envBoolean("FINSIGHT_ENABLE_CHARTS", true);
+  const chartsEnabled = envBoolean("REPORT_ENGINE_ENABLE_CHARTS", true, "FINSIGHT_ENABLE_CHARTS");
   const required = [
     ["主模型配置", Boolean(
-      (process.env.FINSIGHT_DS_MODEL_NAME || process.env.DS_MODEL_NAME || process.env.DEEPSEEK_MODEL)?.trim()
-      && (process.env.FINSIGHT_DS_API_KEY || process.env.DS_API_KEY || process.env.DEEPSEEK_API_KEY)?.trim()
-      && (process.env.FINSIGHT_DS_BASE_URL || process.env.DS_BASE_URL || process.env.DEEPSEEK_BASE_URL)?.trim()
+      (process.env.REPORT_ENGINE_DS_MODEL_NAME || process.env.FINSIGHT_DS_MODEL_NAME || process.env.DS_MODEL_NAME || process.env.DEEPSEEK_MODEL)?.trim()
+      && (process.env.REPORT_ENGINE_DS_API_KEY || process.env.FINSIGHT_DS_API_KEY || process.env.DS_API_KEY || process.env.DEEPSEEK_API_KEY)?.trim()
+      && (process.env.REPORT_ENGINE_DS_BASE_URL || process.env.FINSIGHT_DS_BASE_URL || process.env.DS_BASE_URL || process.env.DEEPSEEK_BASE_URL)?.trim()
     )],
     ["Embedding 模型配置", Boolean(
-      (process.env.FINSIGHT_EMBEDDING_MODEL_NAME || process.env.EMBEDDING_MODEL_NAME)?.trim()
-      && (process.env.FINSIGHT_EMBEDDING_API_KEY || process.env.EMBEDDING_API_KEY)?.trim()
-      && (process.env.FINSIGHT_EMBEDDING_BASE_URL || process.env.EMBEDDING_BASE_URL)?.trim()
+      (process.env.REPORT_ENGINE_EMBEDDING_MODEL_NAME || process.env.FINSIGHT_EMBEDDING_MODEL_NAME || process.env.EMBEDDING_MODEL_NAME)?.trim()
+      && (process.env.REPORT_ENGINE_EMBEDDING_API_KEY || process.env.FINSIGHT_EMBEDDING_API_KEY || process.env.EMBEDDING_API_KEY)?.trim()
+      && (process.env.REPORT_ENGINE_EMBEDDING_BASE_URL || process.env.FINSIGHT_EMBEDDING_BASE_URL || process.env.EMBEDDING_BASE_URL)?.trim()
     )],
     ...(chartsEnabled ? [
       ["VLM 图表模型配置", Boolean(
-        (process.env.FINSIGHT_VLM_MODEL_NAME || process.env.VLM_MODEL_NAME)?.trim()
-        && (process.env.FINSIGHT_VLM_API_KEY || process.env.VLM_API_KEY)?.trim()
-        && (process.env.FINSIGHT_VLM_BASE_URL || process.env.VLM_BASE_URL)?.trim()
+        (process.env.REPORT_ENGINE_VLM_MODEL_NAME || process.env.FINSIGHT_VLM_MODEL_NAME || process.env.VLM_MODEL_NAME)?.trim()
+        && (process.env.REPORT_ENGINE_VLM_API_KEY || process.env.FINSIGHT_VLM_API_KEY || process.env.VLM_API_KEY)?.trim()
+        && (process.env.REPORT_ENGINE_VLM_BASE_URL || process.env.FINSIGHT_VLM_BASE_URL || process.env.VLM_BASE_URL)?.trim()
       )],
     ] : []),
   ] as Array<[string, boolean]>;
@@ -99,7 +99,7 @@ export async function runFinSightReport(
     throw new Error(`星图多智能体研报引擎尚未就绪：${status.missing.join("、")}`);
   }
   const runId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
-  const runsRoot = path.resolve(process.cwd(), process.env.FINSIGHT_RUNS_DIR?.trim() || "data/finsight-runs");
+  const runsRoot = path.resolve(process.cwd(), (process.env.REPORT_ENGINE_RUNS_DIR || process.env.FINSIGHT_RUNS_DIR)?.trim() || "data/finsight-runs");
   const runDir = path.join(runsRoot, runId);
   await mkdir(runDir, { recursive: true });
   const requestPath = path.join(runDir, "bridge.request.json");
@@ -111,13 +111,13 @@ export async function runFinSightReport(
     focus: input.focus,
     question: input.focus,
     targetType: input.targetType,
-    resume: envBoolean("FINSIGHT_RESUME", true),
-    maxConcurrent: envInteger("FINSIGHT_MAX_CONCURRENT", 3, 1, 16),
-    maxIterations: envInteger("FINSIGHT_MAX_ITERATIONS", 20, 1, 100),
-    generateTasks: envBoolean("FINSIGHT_GENERATE_TASKS", true),
+    resume: envBoolean("REPORT_ENGINE_RESUME", true, "FINSIGHT_RESUME"),
+    maxConcurrent: envInteger("REPORT_ENGINE_MAX_CONCURRENT", 3, 1, 16, "FINSIGHT_MAX_CONCURRENT"),
+    maxIterations: envInteger("REPORT_ENGINE_MAX_ITERATIONS", 20, 1, 100, "FINSIGHT_MAX_ITERATIONS"),
+    generateTasks: envBoolean("REPORT_ENGINE_GENERATE_TASKS", true, "FINSIGHT_GENERATE_TASKS"),
     enableCharts: status.chartsEnabled,
-    addReferences: envBoolean("FINSIGHT_ADD_REFERENCES", true),
-    echo: envBoolean("FINSIGHT_ECHO", false),
+    addReferences: envBoolean("REPORT_ENGINE_ADD_REFERENCES", true, "FINSIGHT_ADD_REFERENCES"),
+    echo: envBoolean("REPORT_ENGINE_ECHO", false, "FINSIGHT_ECHO"),
   }, null, 2), "utf8");
 
   const bridgePath = path.join(status.serviceRoot, "integration", "report_workshop_bridge.py");
@@ -204,7 +204,7 @@ export async function runFinSightReport(
 export async function readFinSightArtifact(
   artifact: ResearchReportArtifact,
 ): Promise<Uint8Array | null> {
-  const runsRoot = path.resolve(process.cwd(), process.env.FINSIGHT_RUNS_DIR?.trim() || "data/finsight-runs");
+  const runsRoot = path.resolve(process.cwd(), (process.env.REPORT_ENGINE_RUNS_DIR || process.env.FINSIGHT_RUNS_DIR)?.trim() || "data/finsight-runs");
   const resolved = path.resolve(artifact.path);
   if (!resolved.startsWith(`${runsRoot}${path.sep}`)) return null;
   try {
@@ -249,11 +249,11 @@ export function normalizeFinSightMarkdown(markdown: string): { markdown: string;
 }
 
 function finSightServiceRoot() {
-  return path.resolve(process.cwd(), process.env.FINSIGHT_SERVICE_ROOT?.trim() || "services/finsight");
+  return path.resolve(process.cwd(), (process.env.REPORT_ENGINE_SERVICE_ROOT || process.env.FINSIGHT_SERVICE_ROOT)?.trim() || "services/finsight");
 }
 
 async function resolvePython(serviceRoot: string) {
-  const configured = process.env.FINSIGHT_PYTHON_BIN?.trim();
+  const configured = (process.env.REPORT_ENGINE_PYTHON_BIN || process.env.FINSIGHT_PYTHON_BIN)?.trim();
   if (configured) {
     if (!configured.includes(path.sep)) return configured;
     const resolved = path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
@@ -281,14 +281,14 @@ function inferSourceType(content: string) {
   return "深度研究网络资料";
 }
 
-function envBoolean(name: string, fallback: boolean) {
-  const value = process.env[name]?.trim().toLowerCase();
+function envBoolean(name: string, fallback: boolean, legacyName?: string) {
+  const value = (process.env[name] || (legacyName ? process.env[legacyName] : undefined))?.trim().toLowerCase();
   if (!value) return fallback;
   return value !== "false" && value !== "0" && value !== "no";
 }
 
-function envInteger(name: string, fallback: number, min: number, max: number) {
-  const value = Number(process.env[name]);
+function envInteger(name: string, fallback: number, min: number, max: number, legacyName?: string) {
+  const value = Number(process.env[name] || (legacyName ? process.env[legacyName] : undefined));
   return Number.isInteger(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }
 

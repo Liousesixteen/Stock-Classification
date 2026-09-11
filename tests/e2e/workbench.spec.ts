@@ -136,7 +136,7 @@ test("keeps the four report workflows usable on a narrow desktop", async ({ page
   await expect(studio.locator(".report-engine-picker")).toBeInViewport();
   await expect(studio.getByText("Markdown 章节编辑")).toBeVisible();
   if (process.env.CAPTURE_REPORT_WORKSHOP === "1") {
-    await studio.screenshot({ path: "test-results/report-workshop-finsight.png" });
+    await studio.screenshot({ path: "test-results/report-workshop-deep-engine.png" });
   }
 });
 
@@ -152,7 +152,7 @@ test("lays out the multi-agent report engine on a wide desktop", async ({ page }
   await expect(studio.locator(".report-studio-editor")).toBeVisible();
   await expect(studio.locator(".report-studio-quality")).toBeVisible();
   if (process.env.CAPTURE_REPORT_WORKSHOP === "1") {
-    await studio.screenshot({ path: "test-results/report-workshop-finsight-wide.png" });
+    await studio.screenshot({ path: "test-results/report-workshop-deep-engine-wide.png" });
   }
 });
 

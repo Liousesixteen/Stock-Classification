@@ -25,9 +25,9 @@
     "db:backup": "node scripts/backup-database.mjs",
     "db:restore": "node scripts/restore-database.mjs",
     "ops:check": "node scripts/operations-check.mjs",
-    "finsight:setup": "python3 -m venv services/finsight/.venv && services/finsight/.venv/bin/python -m pip install -r services/finsight/requirements.txt",
-    "finsight:test": "CRAWL4_AI_BASE_DIRECTORY=./data/finsight-runtime PYTHONDONTWRITEBYTECODE=1 services/finsight/.venv/bin/python -m pytest services/finsight/tests -p no:cacheprovider",
-    "finsight:backend": "CRAWL4_AI_BASE_DIRECTORY=./data/finsight-runtime services/finsight/.venv/bin/python services/finsight/demo/backend/app.py"
+    "report-engine:setup": "python3 -m venv services/finsight/.venv && services/finsight/.venv/bin/python -m pip install -r services/finsight/requirements.txt",
+    "report-engine:test": "CRAWL4_AI_BASE_DIRECTORY=./data/finsight-runtime PYTHONDONTWRITEBYTECODE=1 services/finsight/.venv/bin/python -m pytest services/finsight/tests -p no:cacheprovider",
+    "report-engine:backend": "CRAWL4_AI_BASE_DIRECTORY=./data/finsight-runtime services/finsight/.venv/bin/python services/finsight/demo/backend/app.py"
   },
   "dependencies": {
     "@fontsource/noto-sans-sc": "^5.3.0",

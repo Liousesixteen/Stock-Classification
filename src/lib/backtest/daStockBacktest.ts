@@ -6,14 +6,14 @@ export type BacktestOperation = "run" | "results" | "performance" | "strategy" |
 
 export async function executeBacktest(operation: BacktestOperation, input: Record<string, unknown>) {
   const serviceRoot = path.join(process.cwd(), "services", "da-stock");
-  const configuredPython = process.env.DA_STOCK_PYTHON;
+  const configuredPython = process.env.STRATEGY_ENGINE_PYTHON || process.env.DA_STOCK_PYTHON;
   const python = configuredPython
     ? (path.isAbsolute(configuredPython) ? configuredPython : path.resolve(process.cwd(), configuredPython))
     : path.join(serviceRoot, ".venv", "bin", "python");
   if (!existsSync(python)) throw new Error("回测运行环境未安装，请执行 npm run backtest:setup");
   const dataDirectory = path.join(process.cwd(), "data", "da-stock");
   mkdirSync(dataDirectory, { recursive: true });
-  const configuredDatabase = process.env.DA_STOCK_BACKTEST_DB;
+  const configuredDatabase = process.env.STRATEGY_ENGINE_BACKTEST_DB || process.env.DA_STOCK_BACKTEST_DB;
   const databasePath = configuredDatabase
     ? (path.isAbsolute(configuredDatabase) ? configuredDatabase : path.resolve(process.cwd(), configuredDatabase))
     : path.join(dataDirectory, "stock_analysis.db");
@@ -35,8 +35,8 @@ export async function executeBacktest(operation: BacktestOperation, input: Recor
         const line = stdout.trim().split("\n").at(-1);
         const result = JSON.parse(line || "{}") as { ok?: boolean; data?: unknown; error?: string };
         if (code === 0 && result.ok) resolve(result.data);
-        else reject(new Error(result.error || "DA-Stock 回测执行失败"));
-      } catch { reject(new Error("DA-Stock 回测返回格式异常")); }
+        else reject(new Error(result.error || "策略回测执行失败"));
+      } catch { reject(new Error("策略回测返回格式异常")); }
     });
     child.stdin.end(JSON.stringify({ operation, ...input }) + "\n");
   });

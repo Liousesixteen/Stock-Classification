@@ -1,5 +1,5 @@
 "use client";
-// Migrated from DA-Stock BacktestPage (MIT); original evaluation flow retained.
+// Strategy backtest workspace; third-party license notices are kept at repository level.
 import type React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { Check, Minus, X } from 'lucide-react';

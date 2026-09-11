@@ -47,9 +47,9 @@ Yidianx 面向需要持续跟踪公司、行业和产业链关系的研究者。
 | 数据与档案 | A 股公司检索、分类树、业务画像、证据来源、同步状态与资料时效 |
 | 三维星图 | 产业全景、局部路径、公司知识图谱、关系筛选、缩略导航与深链分享 |
 | AI 研究 | 问题规划、多方法并行研究、引用约束、支持/反证分栏、会话持久化 |
-| 研报工坊 | 4 类报告、原生/FinSight 引擎、章节编辑、不可变版本、质量评分 |
+| 研报工坊 | 4 类报告、证据约束/多智能体引擎、章节编辑、不可变版本、质量评分 |
 | 交付与治理 | Markdown / DOCX / PDF 导出、任务中心、缺证据提醒、备份与恢复 |
-| 市场与策略 | 行情、新闻、技术指标、DA-Stock 方法工具与本地回测桥接 |
+| 市场与策略 | 行情、新闻、技术指标、量化策略工具与本地回测桥接 |
 
 ## 系统架构
 
@@ -61,13 +61,13 @@ flowchart LR
     API --> RESEARCH[Research Orchestrator]
     API --> REPORT[Report Workshop]
     RESEARCH --> PROVIDERS[Market & Public Data Providers]
-    RESEARCH --> DASTOCK[DA-Stock Adapter]
-    REPORT --> FINSIGHT[FinSight Multi-Agent Engine]
+    RESEARCH --> STRATEGY[Quant Strategy Engine]
+    REPORT --> DEEPREPORT[Multi-Agent Report Engine]
     API --> RICH[Rich Market Workbench]
     DB --> TASKS[Evidence & Task Governance]
 ```
 
-主应用负责身份边界、数据持久化和统一交互；DA-Stock、FinSight 与 Rich Workbench 以本地服务或适配器方式接入，不取代主数据库。
+主应用负责身份边界、数据持久化和统一交互；量化策略、多智能体研报和市场工作台均以本地服务或适配器方式运行，不取代主数据库。
 
 ## 快速开始
 
@@ -101,7 +101,7 @@ npm run backtest:setup
 npm run dev
 ```
 
-打开 [http://localhost:3001](http://localhost:3001)。主命令会同时启动 Yidianx 市场服务，并把 DA-Stock 回测作为“市场工作台”中的内嵌视图提供。
+打开 [http://localhost:3001](http://localhost:3001)。主命令会同时启动 Yidianx 市场服务，并把策略回测作为“市场工作台”中的内嵌视图提供。
 
 首次启动默认创建空的 `data/stock-classification.sqlite`。若要加载内置的半导体、创新药、机器人、商业航天和证券样板，请在 `.env.local` 中设置：
 
@@ -121,7 +121,6 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
 CLASSIFICATION_AGENT_PROVIDER=rules
 
-FINSIGHT_REPORT_ENGINE=native
 STOCK_PROFILE_SOURCE_PRIORITY=disabled
 ```
 
@@ -160,13 +159,10 @@ src/
 ├── app/                    # Next.js 页面、API 与全局样式
 ├── components/             # 星图、研究、报告、任务与市场组件
 └── lib/                    # 数据库、Provider、研究编排和图谱引擎
-services/
-├── da-stock/               # 策略研究与回测适配
-├── finsight/               # 多 Agent 研报引擎
-└── rich-workbench/         # 市场工作台本地服务
+services/                   # 策略、研报与市场工作台本地服务
 scripts/                    # 启动、同步、备份和发布脚本
 tests/                      # 单元、组件、集成、E2E 与安全测试
-docs/                       # 架构迁移、部署、运维和版本说明
+docs/                       # 架构、部署、运维和版本说明
 audit/                      # 视觉设计审计与界面基线
 ```
 
@@ -184,9 +180,6 @@ audit/                      # 视觉设计审计与界面基线
 - [生产部署与发布清单](docs/operations/DEPLOYMENT.md)
 - [数据库备份、验证与恢复](docs/operations/BACKUP_AND_RECOVERY.md)
 - [数据源合规边界](docs/operations/DATA_SOURCE_COMPLIANCE.md)
-- [FinSight 研报引擎迁移](docs/FINSIGHT_REPORT_WORKSHOP_MIGRATION.md)
-- [DA-Stock AI 研究迁移](docs/DA_STOCK_AI_RESEARCH_MIGRATION.md)
-- [项目实现与面试讲解](docs/实习面试项目详解.md)
 
 ## 第三方组件
 
