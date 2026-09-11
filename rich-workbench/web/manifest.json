@@ -1,0 +1,11 @@
+{
+  "name": "Rich System 个人投资工作台",
+  "short_name": "Rich Desk",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060912",
+  "theme_color": "#060912",
+  "lang": "zh-CN",
+  "icons": []
+}
+

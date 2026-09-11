@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-08-21T22:31:16",
+  "ttl_seconds": 300,
+  "source": "failure",
+  "is_stale": false,
+  "data": {
+    "reason": "no fallback data"
+  }
+}

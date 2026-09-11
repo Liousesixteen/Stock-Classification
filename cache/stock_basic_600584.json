@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-08-22T06:13:56",
+  "ttl_seconds": 86400,
+  "source": "a-stock-data:eastmoney+baidu",
+  "is_stale": false,
+  "data": {
+    "symbol": "600584",
+    "name": "长电科技",
+    "industry": "半导体",
+    "concepts": [],
+    "market": "沪市",
+    "list_date": "20030603",
+    "source": "a-stock-data:eastmoney+baidu",
+    "missing_data": []
+  }
+}
